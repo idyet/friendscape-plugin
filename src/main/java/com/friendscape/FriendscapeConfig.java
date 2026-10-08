@@ -16,7 +16,7 @@ public interface FriendscapeConfig extends Config
 	@ConfigItem(
 		keyName = SEND_DATA,
 		name = "Send data to Friendscape",
-		description = "Send your progress in joined Friendscape Events to the Friendscape server",
+		description = "Send your progress in Friendscape Events you are rostered in to the Friendscape server",
 		warning = WARNING,
 		position = 0
 	)
