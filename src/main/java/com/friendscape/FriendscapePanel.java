@@ -36,7 +36,7 @@ class FriendscapePanel extends PluginPanel
 		JPanel header = new JPanel();
 		header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
 
-		JLabel title = new JLabel("Friendscape Events");
+		JLabel title = new JLabel("friendscape");
 		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(ColorScheme.BRAND_ORANGE);
 

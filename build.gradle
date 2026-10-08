@@ -36,18 +36,28 @@ tasks.withType(JavaCompile).configureEach {
 	options.compilerArgs << '-Xlint:deprecation' << '-Werror'
 }
 
-tasks.register('run', JavaExec) {
-	group = 'application'
-	description = 'Launches RuneLite in developer mode with this plugin sideloaded'
-	classpath = sourceSets.test.runtimeClasspath
-	mainClass = pluginMainClass
-	jvmArgs '-ea'
+def configureClientLaunch = { JavaExec task ->
+	task.group = 'application'
+	task.classpath = sourceSets.test.runtimeClasspath
+	task.mainClass = pluginMainClass
+	task.jvmArgs '-ea'
 	// macOS-only: com.apple.eawt doesn't exist on Windows/Linux JDKs, where the flag would print a
 	// JVM startup warning on every launch. jvmArgs() appends, so this adds the flag only on mac.
 	if (System.getProperty('os.name').toLowerCase().startsWith('mac')) {
-		jvmArgs '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED'
+		task.jvmArgs '--add-opens=java.desktop/com.apple.eawt=ALL-UNNAMED'
 	}
-	args '--developer-mode', '--debug'
+	task.args '--developer-mode', '--debug'
+}
+
+tasks.register('run', JavaExec) {
+	description = 'Launches RuneLite in developer mode with this plugin sideloaded'
+	configureClientLaunch(it)
+}
+
+tasks.register('runDev', JavaExec) {
+	description = 'Like run, but points the plugin at the dev API host'
+	configureClientLaunch(it)
+	systemProperty 'friendscape.apiBase', 'https://dev.friendscape.cc/api/'
 }
 
 tasks.register('shadowJar', Jar) {

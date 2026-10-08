@@ -1,4 +1,4 @@
-# Friendscape Events: RuneLite plugin
+# friendscape: RuneLite plugin
 
 RuneLite plugin that feeds Friendscape Events with XP, KC, item, collection log and pet progress. Sending is off by default and opt-in per the Plugin Hub rules.
 
@@ -31,7 +31,8 @@ org.gradle.java.home=/path/to/jdk
 
 - `./gradlew build` compiles and runs the tests (CI runs the same on every PR).
 - `./gradlew run` launches RuneLite in developer mode with the plugin sideloaded.
-- The API base defaults to `https://www.friendscape.cc/api/`, the production host. Until public opening (backlog ticket 047) www serves only the coming soon page, so the health check there fails and the header shows "Server unreachable". Point a sideloaded build at the dev host with `-Dfriendscape.apiBase=<url>` (add it to the `run` task's `jvmArgs`).
+- `./gradlew runDev` does the same against the dev API host, `https://dev.friendscape.cc/api/`.
+- The API base defaults to `https://www.friendscape.cc/api/`, the production host. Until public opening (backlog ticket 047) www serves only the coming soon page, so the health check there fails and the header shows "Server unreachable". Use `./gradlew runDev` until then, or point a build anywhere else with `-Dfriendscape.apiBase=<url>`.
 
 ## License
 

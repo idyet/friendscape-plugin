@@ -26,7 +26,7 @@ import okhttp3.OkHttpClient;
 
 @Slf4j
 @PluginDescriptor(
-	name = "Friendscape Events",
+	name = "friendscape",
 	description = "Tracks your progress in Friendscape clan Events: bingo, Skill of the week, Boss of the week",
 	tags = {"bingo", "clan", "event", "sotw", "botw", "competition", "friendscape"}
 )
@@ -78,7 +78,7 @@ public class FriendscapePlugin extends Plugin
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
-			.tooltip("Friendscape Events")
+			.tooltip("friendscape")
 			.icon(icon)
 			.priority(7)
 			.panel(panel)
