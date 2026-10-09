@@ -4,8 +4,12 @@ import com.google.gson.Gson;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -13,6 +17,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
@@ -20,7 +25,12 @@ import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
+import net.runelite.client.Notifier;
 import net.runelite.client.callback.ClientThread;
+import net.runelite.client.chat.ChatColorType;
+import net.runelite.client.chat.ChatMessageBuilder;
+import net.runelite.client.chat.ChatMessageManager;
+import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
@@ -29,7 +39,9 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.task.Schedule;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
+import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
+import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 
@@ -66,8 +78,19 @@ public class FriendscapePlugin extends Plugin
 	@Inject
 	private Gson gson;
 
+	@Inject
+	private OverlayManager overlayManager;
+
+	@Inject
+	private Notifier notifier;
+
+	@Inject
+	private ChatMessageManager chatMessageManager;
+
+	private HttpUrl apiBase;
 	private FriendscapeApi api;
 	private FriendscapePanel panel;
+	private FriendscapeOverlay overlay;
 	private NavigationButton navButton;
 
 	// Written on the client thread, read by the API gate on OkHttp threads and by the scheduler.
@@ -86,6 +109,9 @@ public class FriendscapePlugin extends Plugin
 	private final AtomicReference<Instant> momentReadingAt = new AtomicReference<>();
 	/** The last answer to a Reading, for which moments have passed; written on OkHttp threads. */
 	private volatile ReadingsResponse lastResponse;
+	/** The last answer to discovery, null until one comes; the cards come from it. OkHttp threads. */
+	private volatile DiscoveryResponse discovery;
+	private final ProblemNotices notices = new ProblemNotices();
 
 	@Provides
 	FriendscapeConfig provideConfig(ConfigManager configManager)
@@ -96,9 +122,32 @@ public class FriendscapePlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		api = new FriendscapeApi(okHttpClient, gson, apiBase(), this::mayTransmit);
+		apiBase = apiBase();
+		api = new FriendscapeApi(okHttpClient, gson, apiBase, this::mayTransmit);
 		resetReadings();
-		panel = new FriendscapePanel(this::setSending);
+		panel = new FriendscapePanel(this::setSending, new FriendscapePanel.CardActions()
+		{
+			@Override
+			public void leave(String slug)
+			{
+				setLeft(slug, true);
+			}
+
+			@Override
+			public void rejoin(String slug)
+			{
+				setLeft(slug, false);
+			}
+
+			@Override
+			public void openEventPage(String slug)
+			{
+				LinkBrowser.browse(FriendscapeApi.eventPage(apiBase, slug));
+			}
+		});
+		panel.setOnOpen(this::discover);
+		overlay = new FriendscapeOverlay(this, () -> config.overlay() && mayTransmit());
+		overlayManager.add(overlay);
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
@@ -125,11 +174,13 @@ public class FriendscapePlugin extends Plugin
 	{
 		api.cancelAll();
 		clientToolbar.removeNavigation(navButton);
+		overlayManager.remove(overlay);
 		loggedIn = false;
 		worldTracked = false;
 		rsn = null;
 		connection = ConnectionStatus.CONNECTING;
 		resetReadings();
+		notices.reset();
 		// api stays set: an async @Schedule tick racing shutdown must not hit null, and the gate refuses anyway
 		navButton = null;
 		panel = null;
@@ -151,11 +202,16 @@ public class FriendscapePlugin extends Plugin
 			case LOGIN_SCREEN:
 				api.cancelAll();
 				// The logout Reading: still permitted, as loggedIn only clears below
-				sendReadings(xpTracker.takeChanged(Instant.now()), Set.of());
+				if (readingsWanted(Instant.now()))
+				{
+					sendReadings(xpTracker.takeChanged(Instant.now()), Set.of());
+				}
 				loggedIn = false;
 				rsn = null;
 				connection = ConnectionStatus.CONNECTING;
 				resetReadings();
+				// A new session: problems may be told again
+				notices.reset();
 				break;
 			default:
 				return;
@@ -177,6 +233,7 @@ public class FriendscapePlugin extends Plugin
 			accountHash = client.getAccountHash();
 			rsn = player.getName();
 			refreshPanel();
+			discover();
 		}
 		sendDueReadings(Instant.now());
 	}
@@ -193,13 +250,23 @@ public class FriendscapePlugin extends Plugin
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
-		if (!FriendscapeConfig.GROUP.equals(event.getGroup()) || !FriendscapeConfig.SEND_DATA.equals(event.getKey()))
+		if (!FriendscapeConfig.GROUP.equals(event.getGroup()))
+		{
+			return;
+		}
+		if (FriendscapeConfig.LEFT_EVENTS.equals(event.getKey()))
+		{
+			refreshPanel();
+			return;
+		}
+		if (!FriendscapeConfig.SEND_DATA.equals(event.getKey()))
 		{
 			return;
 		}
 		if (config.sendData())
 		{
 			checkHealth();
+			discover();
 		}
 		else
 		{
@@ -217,6 +284,13 @@ public class FriendscapePlugin extends Plugin
 		{
 			checkHealth();
 		}
+	}
+
+	/** Cards and standings stay fresh while logged in (SPEC 10.3). */
+	@Schedule(period = 60, unit = ChronoUnit.SECONDS, asynchronous = true)
+	public void pollDiscovery()
+	{
+		discover();
 	}
 
 	private void handleLogin()
@@ -240,12 +314,24 @@ public class FriendscapePlugin extends Plugin
 		Instant moment = momentReadingAt.get();
 		ReadingsResponse last = lastResponse;
 		// Compare-and-set: a retry an answer schedules meanwhile must not be lost
+		DiscoveryResponse found = discovery;
 		if (moment != null && !now.isBefore(moment) && momentReadingAt.compareAndSet(moment, null))
 		{
 			sendAllSkills = true;
-			pendingMoments = last == null ? Set.of() : last.momentsDue(now);
+			// Either may know of the moment: a Reading's answer of an end, discovery of a new start.
+			// An extra mark is harmless: the server applies one only within a minute of the moment.
+			Set<Moment> due = EnumSet.noneOf(Moment.class);
+			if (last != null)
+			{
+				due.addAll(last.momentsDue(now));
+			}
+			if (found != null)
+			{
+				due.addAll(found.asReadings(left()).momentsDue(now));
+			}
+			pendingMoments = due;
 		}
-		if (!mayTransmit())
+		if (!mayTransmit() || !readingsWanted(now))
 		{
 			return;
 		}
@@ -294,16 +380,111 @@ public class FriendscapePlugin extends Plugin
 		{
 			return;
 		}
-		api.sendReadings(name, accountHash, xp, moments, response ->
+		DiscoveryResponse found = discovery;
+		Set<String> muted = found == null ? Set.of() : found.muted(left());
+		api.sendReadings(name, accountHash, xp, moments, muted, response ->
 		{
-			// Per-Event statuses feed the cards (ticket 014); for now only start and end Readings use them
 			lastResponse = response;
-			Instant next = response.nextMomentReading(Instant.now());
-			if (next != null)
+			scheduleMomentReading(response.without(left()));
+			// A status the cards do not show yet (held, removed, ended): refresh them now
+			DiscoveryResponse shown = discovery;
+			if (shown == null || !shown.asReadings(Set.of()).statuses().equals(response.statuses()))
 			{
-				momentReadingAt.set(next);
+				discover();
 			}
 		});
+	}
+
+	/** Brings the next start or end Reading forward to the one {@code known} expects, if earlier. */
+	private void scheduleMomentReading(ReadingsResponse known)
+	{
+		Instant next = known.nextMomentReading(Instant.now());
+		if (next != null)
+		{
+			momentReadingAt.accumulateAndGet(next, (current, proposed) ->
+				current == null || proposed.isBefore(current) ? proposed : current);
+		}
+	}
+
+	/**
+	 * Whether a Reading could count anywhere. Waits for discovery: a Reading sent before it answers
+	 * could be for an Event left on this install.
+	 */
+	private boolean readingsWanted(Instant now)
+	{
+		DiscoveryResponse found = discovery;
+		return found != null && found.wantsReadings(left(), now);
+	}
+
+	/**
+	 * Fetches the cards: on login, on panel open, when sending turns on and every minute. Also reports
+	 * whether the server is reachable, which the header dot shows.
+	 */
+	private void discover()
+	{
+		String name = rsn;
+		if (name == null || !mayTransmit())
+		{
+			return;
+		}
+		api.discover(name, accountHash, response ->
+		{
+			discovery = response;
+			scheduleMomentReading(response.asReadings(left()));
+			List<ProblemNotices.Notice> told = notices.check(response, left());
+			for (ProblemNotices.Notice notice : told)
+			{
+				tell(notice);
+			}
+			refreshPanel();
+		}, up ->
+		{
+			ConnectionStatus now = up ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE;
+			if (connection != now)
+			{
+				connection = now;
+				refreshPanel();
+			}
+		});
+	}
+
+	/** A chat line, red with the notifier for a problem (SPEC 10.4). */
+	private void tell(ProblemNotices.Notice notice)
+	{
+		String message = new ChatMessageBuilder()
+			.append(notice.isProblem() ? ChatColorType.HIGHLIGHT : ChatColorType.NORMAL)
+			.append("[Friendscape] " + notice.getText())
+			.build();
+		chatMessageManager.queue(QueuedMessage.builder()
+			.type(ChatMessageType.CONSOLE)
+			.runeLiteFormattedMessage(message)
+			.build());
+		if (notice.isProblem() && config.notifyOnProblems())
+		{
+			notifier.notify("Friendscape: " + notice.getText());
+		}
+	}
+
+	/** Events left on this install (SPEC 10.3): nothing more is sent for them. */
+	private Set<String> left()
+	{
+		return LeftEvents.parse(config.leftEvents());
+	}
+
+	private void setLeft(String slug, boolean leave)
+	{
+		Set<String> left = new HashSet<>(left());
+		boolean changed = leave ? left.add(slug) : left.remove(slug);
+		if (!changed)
+		{
+			return;
+		}
+		if (!leave)
+		{
+			// Back in: the next Reading carries every skill, as at login
+			sendAllSkills = true;
+		}
+		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, LeftEvents.format(left));
 	}
 
 	private void resetReadings()
@@ -313,6 +494,7 @@ public class FriendscapePlugin extends Plugin
 		pendingMoments = Set.of();
 		momentReadingAt.set(null);
 		lastResponse = null;
+		discovery = null;
 	}
 
 	/** The server's key for a skill, e.g. {@code runecraft}. */
@@ -365,10 +547,18 @@ public class FriendscapePlugin extends Plugin
 
 	private void refreshPanel()
 	{
+		DiscoveryResponse found = discovery;
+		List<EventCard> cards = found == null ? null : found.cards(left(), Instant.now(), ZoneId.systemDefault());
+		FriendscapeOverlay shownOverlay = overlay;
+		if (shownOverlay != null)
+		{
+			shownOverlay.setCards(cards == null ? List.of() : cards);
+		}
 		PanelState state = PanelState.builder()
 			.sending(config.sendData())
 			.rsn(rsn)
 			.status(status())
+			.cards(cards)
 			.build();
 		FriendscapePanel target = panel;
 		if (target != null)

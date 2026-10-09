@@ -55,18 +55,53 @@ class FriendscapeApi
 	}
 
 	/**
-	 * Sends absolute skill XP by skill slug, marked as the start or end Reading for {@code moments}.
-	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
-	 * a total that covers it. The server's answer comes back on an OkHttp thread; nothing comes back
-	 * for a failed or refused send.
+	 * Asks which Events rosters the character, with each one's phase, Roster entry state and
+	 * standing. {@code onReachable} hears whether the server answered at all: a refusal (4xx) is an
+	 * answer, a server error or failed connection is not. Both come back on an OkHttp thread, and
+	 * nothing comes back for a refused or cancelled call.
 	 */
-	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Set<Moment> moments,
-		Consumer<ReadingsResponse> onResult)
+	void discover(String rsn, long accountHash, Consumer<DiscoveryResponse> onResult, Consumer<Boolean> onReachable)
+	{
+		Request request = new Request.Builder()
+			.url(base.resolve("v1/plugin/discovery"))
+			.post(RequestBody.create(JSON, gson.toJson(identity(rsn, accountHash))))
+			.build();
+		enqueue(request, response ->
+		{
+			onReachable.accept(response.code() < 500);
+			DiscoveryResponse parsed = parse(response, DiscoveryResponse.class);
+			if (parsed != null)
+			{
+				onResult.accept(parsed);
+			}
+		}, error -> onReachable.accept(false));
+	}
+
+	/** The website's page for an Event: {@code /e/<slug>} on the API's host. */
+	static String eventPage(HttpUrl base, String slug)
+	{
+		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).build().toString();
+	}
+
+	private static Map<String, Object> identity(String rsn, long accountHash)
 	{
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("rsn", rsn);
 		// A Java long does not fit a JSON number, so the hash travels as text
 		body.put("accountHash", Long.toString(accountHash));
+		return body;
+	}
+
+	/**
+	 * Sends absolute skill XP by skill slug, marked as the start or end Reading for {@code moments}.
+	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
+	 * a total that covers it. {@code muted} names the Events left on this install. The server's
+	 * answer comes back on an OkHttp thread; nothing comes back for a failed or refused send.
+	 */
+	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Set<Moment> moments, Set<String> muted,
+		Consumer<ReadingsResponse> onResult)
+	{
+		Map<String, Object> body = identity(rsn, accountHash);
 		body.put("xp", xp);
 		if (moments.contains(Moment.START))
 		{
@@ -75,6 +110,11 @@ class FriendscapeApi
 		if (moments.contains(Moment.END))
 		{
 			body.put("atEnd", true);
+		}
+		if (!muted.isEmpty())
+		{
+			// Stateless: the server captures nothing for these, and never learns of a Leave
+			body.put("muted", muted);
 		}
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/readings"))

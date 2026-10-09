@@ -114,4 +114,15 @@ public class ReadingsResponseTest
 		assertNull(parse("{\"rsn\":\"Nobody\",\"events\":[]}").nextMomentReading(NOW));
 		assertNull(parse("{}").nextMomentReading(NOW));
 	}
+
+	@Test
+	public void schedulesNothingForAnEventLeftOnThisInstall()
+	{
+		ReadingsResponse response = parse("{\"events\":["
+			+ "{\"slug\":\"left\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"slug\":\"kept\",\"status\":\"not_started\",\"startsAt\":\"2026-11-02T18:00:00.000Z\"}]}");
+
+		assertEquals(Instant.parse("2026-11-02T18:00:02Z"), response.without(Set.of("left")).nextMomentReading(NOW));
+		assertEquals(java.util.Map.of("left", "not_started", "kept", "not_started"), response.statuses());
+	}
 }

@@ -1,5 +1,6 @@
 package com.friendscape;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.Value;
 
@@ -12,4 +13,6 @@ class PanelState
 	String rsn;
 	@Builder.Default
 	ConnectionStatus status = ConnectionStatus.LOGGED_OUT;
+	/** One per discovered Event; null until discovery answers, empty when on no Roster. */
+	List<EventCard> cards;
 }
