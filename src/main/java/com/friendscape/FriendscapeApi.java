@@ -55,17 +55,27 @@ class FriendscapeApi
 	}
 
 	/**
-	 * Sends absolute skill XP by skill slug. Readings are never queued or retried: a failed send is
-	 * dropped, since the next Reading carries a total that covers it. The server's answer comes back
-	 * on an OkHttp thread; nothing comes back for a failed or refused send.
+	 * Sends absolute skill XP by skill slug, marked as the start or end Reading for {@code moments}.
+	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
+	 * a total that covers it. The server's answer comes back on an OkHttp thread; nothing comes back
+	 * for a failed or refused send.
 	 */
-	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Consumer<ReadingsResponse> onResult)
+	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Set<Moment> moments,
+		Consumer<ReadingsResponse> onResult)
 	{
 		Map<String, Object> body = new LinkedHashMap<>();
 		body.put("rsn", rsn);
 		// A Java long does not fit a JSON number, so the hash travels as text
 		body.put("accountHash", Long.toString(accountHash));
 		body.put("xp", xp);
+		if (moments.contains(Moment.START))
+		{
+			body.put("atStart", true);
+		}
+		if (moments.contains(Moment.END))
+		{
+			body.put("atEnd", true);
+		}
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/readings"))
 			.post(RequestBody.create(JSON, gson.toJson(body)))

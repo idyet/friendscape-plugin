@@ -2,6 +2,8 @@ package com.friendscape;
 
 import com.google.gson.Gson;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.Set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import org.junit.Test;
@@ -34,7 +36,7 @@ public class ReadingsResponseTest
 			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
 			+ "{\"slug\":\"c\",\"status\":\"counted\",\"startsAt\":\"2026-10-01T18:00:00.000Z\"}]}");
 
-		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextStartReading(NOW));
+		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextMomentReading(NOW));
 	}
 
 	@Test
@@ -42,7 +44,7 @@ public class ReadingsResponseTest
 	{
 		ReadingsResponse response = parse("{\"events\":[{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":null}]}");
 
-		assertNull(response.nextStartReading(NOW));
+		assertNull(response.nextMomentReading(NOW));
 	}
 
 	@Test
@@ -51,13 +53,65 @@ public class ReadingsResponseTest
 		ReadingsResponse response = parse("{\"events\":["
 			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T16:59:59.000Z\"}]}");
 
-		assertEquals(NOW.plusSeconds(10), response.nextStartReading(NOW));
+		assertEquals(NOW.plusSeconds(10), response.nextMomentReading(NOW));
+	}
+
+	@Test
+	public void schedulesTheEndReadingAtTheEndOfACountedEvent()
+	{
+		ReadingsResponse response = parse("{\"events\":["
+			+ "{\"slug\":\"a\",\"status\":\"counted\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"slug\":\"b\",\"status\":\"held\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T17:30:00.000Z\"},"
+			+ "{\"slug\":\"c\",\"status\":\"ended\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T16:00:00.000Z\"}]}");
+
+		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextMomentReading(NOW));
+	}
+
+	@Test
+	public void schedulesWhicheverMomentComesFirst()
+	{
+		ReadingsResponse response = parse("{\"events\":["
+			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T19:00:00.000Z\"},"
+			+ "{\"slug\":\"b\",\"status\":\"counted\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"}]}");
+
+		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextMomentReading(NOW));
+	}
+
+	@Test
+	public void retriesShortlyWhenTheServerHasNotReachedAnEndThisClockHasPassed()
+	{
+		ReadingsResponse response = parse("{\"events\":["
+			+ "{\"slug\":\"a\",\"status\":\"counted\",\"endsAt\":\"2026-11-01T16:59:59.000Z\"}]}");
+
+		assertEquals(NOW.plusSeconds(10), response.nextMomentReading(NOW));
+	}
+
+	@Test
+	public void marksTheMomentsThisClockHasPassed()
+	{
+		ReadingsResponse response = parse("{\"events\":["
+			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T17:00:00.000Z\"},"
+			+ "{\"slug\":\"b\",\"status\":\"counted\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"}]}");
+
+		assertEquals(EnumSet.of(Moment.START), response.momentsDue(NOW));
+		assertEquals(EnumSet.of(Moment.START, Moment.END), response.momentsDue(Instant.parse("2026-11-01T18:00:02Z")));
+	}
+
+	@Test
+	public void marksNothingBeforeAnyMoment()
+	{
+		ReadingsResponse response = parse("{\"events\":["
+			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"slug\":\"b\",\"status\":\"ended\",\"endsAt\":\"2026-11-01T16:00:00.000Z\"}]}");
+
+		assertEquals(Set.of(), response.momentsDue(NOW));
+		assertEquals(Set.of(), parse("{}").momentsDue(NOW));
 	}
 
 	@Test
 	public void schedulesNothingForAnEmptyResponse()
 	{
-		assertNull(parse("{\"rsn\":\"Nobody\",\"events\":[]}").nextStartReading(NOW));
-		assertNull(parse("{}").nextStartReading(NOW));
+		assertNull(parse("{\"rsn\":\"Nobody\",\"events\":[]}").nextMomentReading(NOW));
+		assertNull(parse("{}").nextMomentReading(NOW));
 	}
 }

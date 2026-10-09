@@ -8,6 +8,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -76,10 +78,14 @@ public class FriendscapePlugin extends Plugin
 	private volatile ConnectionStatus connection = ConnectionStatus.CONNECTING;
 
 	private final XpTracker xpTracker = new XpTracker();
-	/** The next Reading carries every skill: after login, sending turning on, or an Event's start. */
+	/** The next Reading carries every skill: after login, sending turning on, or an Event's start or end. */
 	private volatile boolean sendAllSkills = true;
-	/** When an Event the last Reading found not started begins; written on OkHttp threads. */
-	private volatile Instant startReadingAt;
+	/** The marks the next every-skill Reading carries: empty, except for a start or end Reading. */
+	private volatile Set<Moment> pendingMoments = Set.of();
+	/** When an Event the last Reading found starts or ends; written on OkHttp threads. */
+	private final AtomicReference<Instant> momentReadingAt = new AtomicReference<>();
+	/** The last answer to a Reading, for which moments have passed; written on OkHttp threads. */
+	private volatile ReadingsResponse lastResponse;
 
 	@Provides
 	FriendscapeConfig provideConfig(ConfigManager configManager)
@@ -145,7 +151,7 @@ public class FriendscapePlugin extends Plugin
 			case LOGIN_SCREEN:
 				api.cancelAll();
 				// The logout Reading: still permitted, as loggedIn only clears below
-				sendReadings(xpTracker.takeChanged(Instant.now()));
+				sendReadings(xpTracker.takeChanged(Instant.now()), Set.of());
 				loggedIn = false;
 				rsn = null;
 				connection = ConnectionStatus.CONNECTING;
@@ -225,14 +231,19 @@ public class FriendscapePlugin extends Plugin
 		}
 	}
 
-	/** XP Readings (SPEC 5.2): every skill at login and at an Event's start, then changes once a minute. */
+	/**
+	 * XP Readings (SPEC 5.2): every skill at login and at an Event's start or end, then changes once
+	 * a minute. The ones at a start or end are marked as such.
+	 */
 	private void sendDueReadings(Instant now)
 	{
-		Instant start = startReadingAt;
-		if (start != null && !now.isBefore(start))
+		Instant moment = momentReadingAt.get();
+		ReadingsResponse last = lastResponse;
+		// Compare-and-set: a retry an answer schedules meanwhile must not be lost
+		if (moment != null && !now.isBefore(moment) && momentReadingAt.compareAndSet(moment, null))
 		{
-			startReadingAt = null;
 			sendAllSkills = true;
+			pendingMoments = last == null ? Set.of() : last.momentsDue(now);
 		}
 		if (!mayTransmit())
 		{
@@ -246,11 +257,13 @@ public class FriendscapePlugin extends Plugin
 				return;
 			}
 			sendAllSkills = false;
-			sendReadings(xpTracker.takeAll(skills, now));
+			Set<Moment> moments = pendingMoments;
+			pendingMoments = Set.of();
+			sendReadings(xpTracker.takeAll(skills, now), moments);
 		}
 		else if (xpTracker.due(now))
 		{
-			sendReadings(xpTracker.takeChanged(now));
+			sendReadings(xpTracker.takeChanged(now), Set.of());
 		}
 	}
 
@@ -274,20 +287,21 @@ public class FriendscapePlugin extends Plugin
 		return skills;
 	}
 
-	private void sendReadings(Map<String, Long> xp)
+	private void sendReadings(Map<String, Long> xp, Set<Moment> moments)
 	{
 		String name = rsn;
 		if (xp.isEmpty() || name == null)
 		{
 			return;
 		}
-		api.sendReadings(name, accountHash, xp, response ->
+		api.sendReadings(name, accountHash, xp, moments, response ->
 		{
-			// Per-Event statuses feed the cards (ticket 014); for now only the start Reading uses them
-			Instant next = response.nextStartReading(Instant.now());
+			// Per-Event statuses feed the cards (ticket 014); for now only start and end Readings use them
+			lastResponse = response;
+			Instant next = response.nextMomentReading(Instant.now());
 			if (next != null)
 			{
-				startReadingAt = next;
+				momentReadingAt.set(next);
 			}
 		});
 	}
@@ -296,7 +310,9 @@ public class FriendscapePlugin extends Plugin
 	{
 		xpTracker.reset();
 		sendAllSkills = true;
-		startReadingAt = null;
+		pendingMoments = Set.of();
+		momentReadingAt.set(null);
+		lastResponse = null;
 	}
 
 	/** The server's key for a skill, e.g. {@code runecraft}. */

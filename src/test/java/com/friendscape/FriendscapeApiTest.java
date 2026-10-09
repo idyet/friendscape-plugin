@@ -3,8 +3,10 @@ package com.friendscape;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.IOException;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -195,9 +197,15 @@ public class FriendscapeApiTest
 
 	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp) throws InterruptedException
 	{
+		return sendReadings(api, xp, Set.of());
+	}
+
+	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp, Set<Moment> moments)
+		throws InterruptedException
+	{
 		CountDownLatch done = new CountDownLatch(1);
 		AtomicReference<ReadingsResponse> result = new AtomicReference<>();
-		api.sendReadings("Iron Man", -4611686018427387904L, xp, response ->
+		api.sendReadings("Iron Man", -4611686018427387904L, xp, moments, response ->
 		{
 			result.set(response);
 			done.countDown();
@@ -216,6 +224,19 @@ public class FriendscapeApiTest
 		assertEquals(List.of("https://friendscape.test/api/v1/plugin/readings"), requestedUrls);
 		assertEquals(
 			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"xp\":{\"overall\":4600000000}}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void startAndEndReadingsAreMarked() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		sendReadings(api, Map.of("overall", 1L), EnumSet.of(Moment.START, Moment.END));
+
+		assertEquals(
+			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"xp\":{\"overall\":1},"
+				+ "\"atStart\":true,\"atEnd\":true}"),
 			json(requestBodies.get(0)));
 	}
 
