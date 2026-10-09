@@ -6,7 +6,7 @@ Product docs, the build spec and the backlog live in the umbrella repo; the API 
 
 ## Status
 
-Skeleton (backlog ticket 007): the "Send data to Friendscape" config item (off by default), the side panel header with the sending toggle and disclosure, a server health check, and the Leagues and special world filter. Join codes, Event cards and detection come in later tickets.
+Skeleton (backlog ticket 007): the "Send data to Friendscape" config item (off by default), the side panel header with the sending toggle and disclosure, a server health check, and the Leagues and special world filter. XP Readings (ticket 011): every skill at login and at an Event's start, then changed skills at most once a minute, plus a logout Reading; never queued. Event cards, KC and drop detection come in later tickets.
 
 ## Privacy and the opt-in
 

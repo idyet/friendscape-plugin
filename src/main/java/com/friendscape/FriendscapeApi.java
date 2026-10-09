@@ -1,6 +1,10 @@
 package com.friendscape;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonParseException;
 import java.io.IOException;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
@@ -9,9 +13,12 @@ import lombok.extern.slf4j.Slf4j;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
+import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
+import okhttp3.RequestBody;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 /**
  * The only way out of the client. Every call is refused unless {@code permitted} says yes at
@@ -21,14 +28,18 @@ import okhttp3.Response;
 @Slf4j
 class FriendscapeApi
 {
+	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+
 	private final OkHttpClient http;
+	private final Gson gson;
 	private final HttpUrl base;
 	private final BooleanSupplier permitted;
 	private final Set<Call> inFlight = ConcurrentHashMap.newKeySet();
 
-	FriendscapeApi(OkHttpClient http, HttpUrl base, BooleanSupplier permitted)
+	FriendscapeApi(OkHttpClient http, Gson gson, HttpUrl base, BooleanSupplier permitted)
 	{
 		this.http = http;
+		this.gson = gson;
 		this.base = base;
 		this.permitted = permitted;
 	}
@@ -41,6 +52,52 @@ class FriendscapeApi
 	{
 		Request request = new Request.Builder().url(base.resolve("health")).get().build();
 		enqueue(request, response -> onResult.accept(response.isSuccessful()), error -> onResult.accept(false));
+	}
+
+	/**
+	 * Sends absolute skill XP by skill slug. Readings are never queued or retried: a failed send is
+	 * dropped, since the next Reading carries a total that covers it. The server's answer comes back
+	 * on an OkHttp thread; nothing comes back for a failed or refused send.
+	 */
+	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Consumer<ReadingsResponse> onResult)
+	{
+		Map<String, Object> body = new LinkedHashMap<>();
+		body.put("rsn", rsn);
+		// A Java long does not fit a JSON number, so the hash travels as text
+		body.put("accountHash", Long.toString(accountHash));
+		body.put("xp", xp);
+		Request request = new Request.Builder()
+			.url(base.resolve("v1/plugin/readings"))
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		enqueue(request, response ->
+		{
+			ReadingsResponse parsed = parse(response, ReadingsResponse.class);
+			if (parsed != null)
+			{
+				onResult.accept(parsed);
+			}
+		}, error -> log.debug("Reading dropped: {}", error.getMessage()));
+	}
+
+	/** The JSON body of a successful response, or null (logged) for an error status or bad body. */
+	private <T> T parse(Response response, Class<T> type)
+	{
+		ResponseBody body = response.body();
+		if (!response.isSuccessful() || body == null)
+		{
+			log.debug("{} {} answered {}", response.request().method(), response.request().url(), response.code());
+			return null;
+		}
+		try
+		{
+			return gson.fromJson(body.charStream(), type);
+		}
+		catch (JsonParseException e)
+		{
+			log.warn("Unreadable answer from {}", response.request().url(), e);
+			return null;
+		}
 	}
 
 	/** Cancels every in-flight call; their callbacks never fire. */

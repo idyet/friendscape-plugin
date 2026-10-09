@@ -1,7 +1,10 @@
 package com.friendscape;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -14,6 +17,7 @@ import okhttp3.OkHttpClient;
 import okhttp3.Protocol;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import okio.Buffer;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
@@ -28,21 +32,39 @@ public class FriendscapeApiTest
 	private final AtomicReference<String> requestThread = new AtomicReference<>();
 	private final AtomicBoolean permitted = new AtomicBoolean(true);
 
+	private final List<String> requestBodies = new CopyOnWriteArrayList<>();
+
 	private OkHttpClient clientAnswering(int code)
+	{
+		return clientAnswering(code, "{\"status\":\"ok\"}");
+	}
+
+	private OkHttpClient clientAnswering(int code, String json)
 	{
 		Interceptor fake = chain ->
 		{
 			requestedUrls.add(chain.request().url().toString());
+			if (chain.request().body() != null)
+			{
+				Buffer buffer = new Buffer();
+				chain.request().body().writeTo(buffer);
+				requestBodies.add(buffer.readUtf8());
+			}
 			requestThread.set(Thread.currentThread().getName());
 			return new Response.Builder()
 				.request(chain.request())
 				.protocol(Protocol.HTTP_1_1)
 				.code(code)
 				.message("fake")
-				.body(ResponseBody.create(MediaType.get("application/json"), "{\"status\":\"ok\"}"))
+				.body(ResponseBody.create(MediaType.get("application/json"), json))
 				.build();
 		};
 		return new OkHttpClient.Builder().addInterceptor(fake).build();
+	}
+
+	private FriendscapeApi api(OkHttpClient http)
+	{
+		return new FriendscapeApi(http, new Gson(), BASE, permitted::get);
 	}
 
 	private Boolean checkHealth(FriendscapeApi api) throws InterruptedException
@@ -61,7 +83,7 @@ public class FriendscapeApiTest
 	@Test
 	public void healthCheckReportsServerUp() throws InterruptedException
 	{
-		FriendscapeApi api = new FriendscapeApi(clientAnswering(200), BASE, permitted::get);
+		FriendscapeApi api = api(clientAnswering(200));
 
 		assertEquals(Boolean.TRUE, checkHealth(api));
 		assertEquals(List.of("https://friendscape.test/api/health"), requestedUrls);
@@ -70,7 +92,7 @@ public class FriendscapeApiTest
 	@Test
 	public void healthCheckReportsServerDownOnErrorStatus() throws InterruptedException
 	{
-		FriendscapeApi api = new FriendscapeApi(clientAnswering(503), BASE, permitted::get);
+		FriendscapeApi api = api(clientAnswering(503));
 
 		assertEquals(Boolean.FALSE, checkHealth(api));
 	}
@@ -79,7 +101,7 @@ public class FriendscapeApiTest
 	public void nothingIsSentWhileNotPermitted() throws InterruptedException
 	{
 		permitted.set(false);
-		FriendscapeApi api = new FriendscapeApi(clientAnswering(200), BASE, permitted::get);
+		FriendscapeApi api = api(clientAnswering(200));
 
 		AtomicBoolean called = new AtomicBoolean();
 		api.checkHealth(up -> called.set(true));
@@ -92,7 +114,7 @@ public class FriendscapeApiTest
 	@Test
 	public void requestRunsOffTheCallingThread() throws InterruptedException
 	{
-		FriendscapeApi api = new FriendscapeApi(clientAnswering(200), BASE, permitted::get);
+		FriendscapeApi api = api(clientAnswering(200));
 
 		checkHealth(api);
 
@@ -135,7 +157,7 @@ public class FriendscapeApiTest
 	{
 		CountDownLatch entered = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
-		FriendscapeApi api = new FriendscapeApi(clientBlockingUntil(entered, release, false), BASE, permitted::get);
+		FriendscapeApi api = api(clientBlockingUntil(entered, release, false));
 
 		AtomicReference<Boolean> result = new AtomicReference<>();
 		api.checkHealth(result::set);
@@ -153,7 +175,7 @@ public class FriendscapeApiTest
 	{
 		CountDownLatch entered = new CountDownLatch(1);
 		CountDownLatch release = new CountDownLatch(1);
-		FriendscapeApi api = new FriendscapeApi(clientBlockingUntil(entered, release, true), BASE, permitted::get);
+		FriendscapeApi api = api(clientBlockingUntil(entered, release, true));
 
 		AtomicReference<Boolean> result = new AtomicReference<>();
 		api.checkHealth(result::set);
@@ -164,5 +186,56 @@ public class FriendscapeApiTest
 		Thread.sleep(300);
 
 		assertNull("a response arriving after sending turned off is dropped", result.get());
+	}
+
+	private static JsonElement json(String text)
+	{
+		return new Gson().fromJson(text, JsonElement.class);
+	}
+
+	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp) throws InterruptedException
+	{
+		CountDownLatch done = new CountDownLatch(1);
+		AtomicReference<ReadingsResponse> result = new AtomicReference<>();
+		api.sendReadings("Iron Man", -4611686018427387904L, xp, response ->
+		{
+			result.set(response);
+			done.countDown();
+		});
+		done.await(2, TimeUnit.SECONDS);
+		return result.get();
+	}
+
+	@Test
+	public void readingsCarryRsnAccountHashAsTextAndAbsoluteXp() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		sendReadings(api, Map.of("overall", 4_600_000_000L));
+
+		assertEquals(List.of("https://friendscape.test/api/v1/plugin/readings"), requestedUrls);
+		assertEquals(
+			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"xp\":{\"overall\":4600000000}}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void readingsAnswerWithEachEventStatus() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200,
+			"{\"rsn\":\"Iron Man\",\"events\":[{\"slug\":\"sotw\",\"status\":\"ended\",\"startsAt\":null,\"endsAt\":null}]}"));
+
+		ReadingsResponse response = sendReadings(api, Map.of("attack", 1L));
+
+		assertEquals("ended", response.getEvents().get(0).getStatus());
+	}
+
+	@Test
+	public void aRefusedReadingIsDroppedNotRetried() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(400, "{\"error\":\"Not a valid RSN\"}"));
+
+		assertNull(sendReadings(api, Map.of("attack", 1L)));
+		assertEquals(1, requestedUrls.size());
 	}
 }
