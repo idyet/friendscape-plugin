@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -112,6 +113,11 @@ public class FriendscapePlugin extends Plugin
 	/** The last answer to discovery, null until one comes; the cards come from it. OkHttp threads. */
 	private volatile DiscoveryResponse discovery;
 	private final ProblemNotices notices = new ProblemNotices();
+	/**
+	 * Bumped by every reset (logout, sending off): an answer to a call made before it is dropped, as
+	 * cancelling cannot stop a callback already running.
+	 */
+	private final AtomicInteger session = new AtomicInteger();
 
 	@Provides
 	FriendscapeConfig provideConfig(ConfigManager configManager)
@@ -257,6 +263,8 @@ public class FriendscapePlugin extends Plugin
 		if (FriendscapeConfig.LEFT_EVENTS.equals(event.getKey()))
 		{
 			refreshPanel();
+			// A Rejoin may bring back an Event's start or end Reading: schedule it now, not at the next poll
+			discover();
 			return;
 		}
 		if (!FriendscapeConfig.SEND_DATA.equals(event.getKey()))
@@ -382,8 +390,13 @@ public class FriendscapePlugin extends Plugin
 		}
 		DiscoveryResponse found = discovery;
 		Set<String> muted = found == null ? Set.of() : found.muted(left());
+		int sentIn = session.get();
 		api.sendReadings(name, accountHash, xp, moments, muted, response ->
 		{
+			if (session.get() != sentIn)
+			{
+				return;
+			}
 			lastResponse = response;
 			scheduleMomentReading(response.without(left()));
 			// A status the cards do not show yet (held, removed, ended): refresh them now
@@ -427,8 +440,13 @@ public class FriendscapePlugin extends Plugin
 		{
 			return;
 		}
+		int sentIn = session.get();
 		api.discover(name, accountHash, response ->
 		{
+			if (session.get() != sentIn)
+			{
+				return;
+			}
 			discovery = response;
 			scheduleMomentReading(response.asReadings(left()));
 			List<ProblemNotices.Notice> told = notices.check(response, left());
@@ -437,12 +455,12 @@ public class FriendscapePlugin extends Plugin
 				tell(notice);
 			}
 			refreshPanel();
-		}, up ->
+		}, reachable ->
 		{
-			ConnectionStatus now = up ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE;
-			if (connection != now)
+			ConnectionStatus answered = reachable ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE;
+			if (session.get() == sentIn && connection != answered)
 			{
-				connection = now;
+				connection = answered;
 				refreshPanel();
 			}
 		});
@@ -489,6 +507,7 @@ public class FriendscapePlugin extends Plugin
 
 	private void resetReadings()
 	{
+		session.incrementAndGet();
 		xpTracker.reset();
 		sendAllSkills = true;
 		pendingMoments = Set.of();

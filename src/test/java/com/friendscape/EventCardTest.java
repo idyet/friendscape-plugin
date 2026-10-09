@@ -97,6 +97,12 @@ public class EventCardTest
 	}
 
 	@Test
+	public void stillNeedsAttentionWhenHeldAfterEnd()
+	{
+		assertEquals(CardState.ATTENTION, card("\"entry\":\"held\",\"phase\":\"ended\"").getState());
+	}
+
+	@Test
 	public void saysNotOnRosterWhenRemovedMidEvent()
 	{
 		assertEquals(CardState.NOT_ON_ROSTER, card("\"entry\":\"removed\"").getState());

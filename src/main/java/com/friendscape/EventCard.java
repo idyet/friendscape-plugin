@@ -52,13 +52,14 @@ class EventCard
 		{
 			return CardState.FINAL;
 		}
-		if (DiscoveryResponse.ENDED.equals(phase))
-		{
-			return CardState.ENDED;
-		}
+		// Still worth attention after end: a mismatch settled during review lets the progress count
 		if (DiscoveryResponse.HELD.equals(event.getEntry()))
 		{
 			return CardState.ATTENTION;
+		}
+		if (DiscoveryResponse.ENDED.equals(phase))
+		{
+			return CardState.ENDED;
 		}
 		if (DiscoveryResponse.PUBLISHED.equals(phase))
 		{

@@ -55,10 +55,10 @@ class FriendscapeApi
 	}
 
 	/**
-	 * Asks which Events rosters the character, with each one's phase, Roster entry state and
+	 * Asks which Events roster the character, with each one's phase, Roster entry state and
 	 * standing. {@code onReachable} hears whether the server answered at all: a refusal (4xx) is an
-	 * answer, a server error or failed connection is not. Both come back on an OkHttp thread, and
-	 * nothing comes back for a refused or cancelled call.
+	 * answer, a server error or failed connection is not; {@code onResult} hears only a successful
+	 * answer. Both come back on an OkHttp thread, and neither for a call refused here or cancelled.
 	 */
 	void discover(String rsn, long accountHash, Consumer<DiscoveryResponse> onResult, Consumer<Boolean> onReachable)
 	{
@@ -113,7 +113,7 @@ class FriendscapeApi
 		}
 		if (!muted.isEmpty())
 		{
-			// Stateless: the server captures nothing for these, and never learns of a Leave
+			// Named on each Reading only: the server captures nothing for these and stores no Leave
 			body.put("muted", muted);
 		}
 		Request request = new Request.Builder()
