@@ -23,6 +23,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
+import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
@@ -210,7 +211,7 @@ public class FriendscapePlugin extends Plugin
 				// The logout Reading: still permitted, as loggedIn only clears below
 				if (readingsWanted(Instant.now()))
 				{
-					sendReadings(xpTracker.takeChanged(Instant.now()), Set.of());
+					sendReadings(xpTracker.takeChanged(Instant.now()), Map.of(), Set.of());
 				}
 				loggedIn = false;
 				rsn = null;
@@ -250,6 +251,23 @@ public class FriendscapePlugin extends Plugin
 		if (mayTransmit())
 		{
 			xpTracker.observe(skillSlug(event.getSkill()), event.getXp());
+		}
+	}
+
+	/** KC Readings (SPEC 5.2): sent on each kill-count, clue or rifts chat message, never queued. */
+	@Subscribe
+	public void onChatMessage(ChatMessage event)
+	{
+		ChatMessageType type = event.getType();
+		if (type != ChatMessageType.GAMEMESSAGE && type != ChatMessageType.SPAM
+			&& type != ChatMessageType.FRIENDSCHATNOTIFICATION)
+		{
+			return;
+		}
+		KcMessages.Kc kc = KcMessages.parse(event.getMessage());
+		if (kc != null && mayTransmit() && readingsWanted(Instant.now()))
+		{
+			sendReadings(Map.of(), Map.of(kc.getName(), kc.getCount()), Set.of());
 		}
 	}
 
@@ -353,11 +371,11 @@ public class FriendscapePlugin extends Plugin
 			sendAllSkills = false;
 			Set<Moment> moments = pendingMoments;
 			pendingMoments = Set.of();
-			sendReadings(xpTracker.takeAll(skills, now), moments);
+			sendReadings(xpTracker.takeAll(skills, now), Map.of(), moments);
 		}
 		else if (xpTracker.due(now))
 		{
-			sendReadings(xpTracker.takeChanged(now), Set.of());
+			sendReadings(xpTracker.takeChanged(now), Map.of(), Set.of());
 		}
 	}
 
@@ -381,17 +399,17 @@ public class FriendscapePlugin extends Plugin
 		return skills;
 	}
 
-	private void sendReadings(Map<String, Long> xp, Set<Moment> moments)
+	private void sendReadings(Map<String, Long> xp, Map<String, Long> kcChat, Set<Moment> moments)
 	{
 		String name = rsn;
-		if (xp.isEmpty() || name == null)
+		if ((xp.isEmpty() && kcChat.isEmpty()) || name == null)
 		{
 			return;
 		}
 		DiscoveryResponse found = discovery;
 		Set<String> muted = found == null ? Set.of() : found.muted(left());
 		int sentIn = session.get();
-		api.sendReadings(name, accountHash, xp, moments, muted, response ->
+		api.sendReadings(name, accountHash, xp, kcChat, moments, muted, response ->
 		{
 			if (session.get() != sentIn)
 			{

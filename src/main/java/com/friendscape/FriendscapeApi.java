@@ -93,16 +93,25 @@ class FriendscapeApi
 	}
 
 	/**
-	 * Sends absolute skill XP by skill slug, marked as the start or end Reading for {@code moments}.
+	 * Sends absolute skill XP by skill slug and lifetime KC by the name chat uses for it (the server
+	 * maps names to activities), either of which may be empty. Marked as the start or end Reading
+	 * for {@code moments}.
 	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
 	 * a total that covers it. {@code muted} names the Events left on this install. The server's
 	 * answer comes back on an OkHttp thread; nothing comes back for a failed or refused send.
 	 */
-	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Set<Moment> moments, Set<String> muted,
-		Consumer<ReadingsResponse> onResult)
+	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Map<String, Long> kcChat,
+		Set<Moment> moments, Set<String> muted, Consumer<ReadingsResponse> onResult)
 	{
 		Map<String, Object> body = identity(rsn, accountHash);
-		body.put("xp", xp);
+		if (!xp.isEmpty())
+		{
+			body.put("xp", xp);
+		}
+		if (!kcChat.isEmpty())
+		{
+			body.put("kcChat", kcChat);
+		}
 		if (moments.contains(Moment.START))
 		{
 			body.put("atStart", true);
