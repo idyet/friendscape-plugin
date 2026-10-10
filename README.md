@@ -21,6 +21,10 @@ Plugin Hub manifest `warning=` line (also the config item's confirm text):
 warning=This plugin submits your username, account hash, drops, kill counts, XP and screenshots to a 3rd-party server (friendscape) not controlled or verified by the RuneLite Developers.
 ```
 
+## Testers
+
+Until the plugin is on the Plugin Hub, testers run a standalone client built with `./gradlew shadowJar` (`build/libs/friendscape-1.0-SNAPSHOT-all.jar`). Send them that jar and [SIDELOAD.md](SIDELOAD.md). Rebuild after a game update if the client reports it is out of date.
+
 ## Development
 
 Requires JDK 11 or later (the Plugin Hub builds with 11). Put a local JDK path in the gitignored `gradle.properties` if Gradle should not use the default:
