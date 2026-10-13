@@ -21,20 +21,53 @@ class EventCard
 	String detail;
 	/** The standing line, one per Team, then the player's own gain when on a real Team. */
 	List<String> standing;
+	/** Lines that ask something of the player: uploads, and Submissions queued or pushed out. */
+	List<String> notes;
 	/** The best Team's rank for the overlay, e.g. {@code 2nd/4}; empty without a standing. */
 	String rank;
+
+	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
+	@Value
+	static class Queued
+	{
+		static final Queued NONE = new Queued(0, 0);
+
+		/** Still in the send queue. */
+		int waiting;
+		/** Pushed out of the full queue this session, for the player to upload by hand. */
+		int pushedOut;
+	}
 
 	boolean isLeft()
 	{
 		return state == CardState.LEFT;
 	}
 
-	static EventCard of(DiscoveryResponse.DiscoveredEvent event, boolean left, ZoneId zone)
+	static EventCard of(DiscoveryResponse.DiscoveredEvent event, boolean left, Queued queued, ZoneId zone)
 	{
 		CardState state = state(event, left);
 		boolean ranked = hasStanding(event);
 		return new EventCard(event.getSlug(), event.getName(), state, detail(event, state, zone),
-			ranked ? standing(event) : List.of(), ranked ? rank(event.getStanding()) : "");
+			ranked ? standing(event) : List.of(), notes(event, state, queued), ranked ? rank(event.getStanding()) : "");
+	}
+
+	private static List<String> notes(DiscoveryResponse.DiscoveredEvent event, CardState state, Queued queued)
+	{
+		List<String> notes = new ArrayList<>();
+		if (state == CardState.ATTENTION && event.getNeedsEvidence() > 0)
+		{
+			notes.add("Open event page to upload");
+		}
+		if (queued.getWaiting() > 0)
+		{
+			notes.add(queued.getWaiting() + " waiting to send");
+		}
+		if (queued.getPushedOut() > 0)
+		{
+			notes.add(queued.getPushedOut() + " taken out of the full send queue: upload "
+				+ (queued.getPushedOut() == 1 ? "it" : "them") + " on the event page");
+		}
+		return notes;
 	}
 
 	private static CardState state(DiscoveryResponse.DiscoveredEvent event, boolean left)
@@ -52,8 +85,9 @@ class EventCard
 		{
 			return CardState.FINAL;
 		}
-		// Still worth attention after end: a mismatch settled during review lets the progress count
-		if (DiscoveryResponse.HELD.equals(event.getEntry()))
+		// Still worth attention after end: a mismatch settled during review lets the progress count,
+		// and needs-evidence uploads stay open until Finalize
+		if (DiscoveryResponse.HELD.equals(event.getEntry()) || event.getNeedsEvidence() > 0)
 		{
 			return CardState.ATTENTION;
 		}
@@ -81,7 +115,12 @@ class EventCard
 			case ENDED:
 				return "Ended, results provisional";
 			case ATTENTION:
-				return "On hold while Friendscape checks this RSN";
+				if (DiscoveryResponse.HELD.equals(event.getEntry()))
+				{
+					return "On hold while Friendscape checks this RSN";
+				}
+				int items = event.getNeedsEvidence();
+				return items == 1 ? "1 item needs a screenshot" : items + " items need a screenshot";
 			case NOT_SCHEDULED:
 				return "Not scheduled yet";
 			default:

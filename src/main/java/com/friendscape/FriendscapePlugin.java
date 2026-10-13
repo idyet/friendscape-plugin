@@ -3,9 +3,13 @@ package com.friendscape;
 import com.google.gson.Gson;
 import com.google.inject.Provides;
 import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,8 +17,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +37,7 @@ import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
 import net.runelite.client.Notifier;
+import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
 import net.runelite.client.chat.ChatMessageBuilder;
@@ -36,10 +46,14 @@ import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
+import net.runelite.client.events.ServerNpcLoot;
+import net.runelite.client.game.ItemManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
+import net.runelite.client.plugins.loottracker.LootReceived;
 import net.runelite.client.task.Schedule;
 import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.DrawManager;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.ImageUtil;
@@ -58,6 +72,10 @@ public class FriendscapePlugin extends Plugin
 	/** Developer override for the API base, e.g. {@code -Dfriendscape.apiBase=http://localhost:3000/api/}. */
 	static final String API_BASE_PROPERTY = "friendscape.apiBase";
 	private static final String DEFAULT_API_BASE = "https://www.friendscape.cc/api/";
+	/** The send queue (SPEC 10.5), under {@code .runelite/friendscape/}. */
+	private static final File SUBMISSIONS_DIR = new File(new File(RuneLite.RUNELITE_DIR, "friendscape"), "submissions");
+	/** A frame not drawn by then (client minimised, say) means the screenshot failed. */
+	private static final long SCREENSHOT_TIMEOUT_SECONDS = 5;
 
 	@Inject
 	private Client client;
@@ -89,6 +107,15 @@ public class FriendscapePlugin extends Plugin
 	@Inject
 	private ChatMessageManager chatMessageManager;
 
+	@Inject
+	private ItemManager itemManager;
+
+	@Inject
+	private DrawManager drawManager;
+
+	@Inject
+	private ScheduledExecutorService executor;
+
 	private HttpUrl apiBase;
 	private FriendscapeApi api;
 	private FriendscapePanel panel;
@@ -114,6 +141,10 @@ public class FriendscapePlugin extends Plugin
 	/** The last answer to discovery, null until one comes; the cards come from it. OkHttp threads. */
 	private volatile DiscoveryResponse discovery;
 	private final ProblemNotices notices = new ProblemNotices();
+	/** Fed on the client thread only; its watch is set there too, from any thread via invokeLater. */
+	private volatile SubmissionDetector detector;
+	/** Null until the queue opens on the executor, or for good if it cannot. */
+	private volatile SubmissionSender sender;
 	/**
 	 * Bumped by every reset (logout, sending off): an answer to a call made before it is dropped, as
 	 * cancelling cannot stop a callback already running.
@@ -131,7 +162,9 @@ public class FriendscapePlugin extends Plugin
 	{
 		apiBase = apiBase();
 		api = new FriendscapeApi(okHttpClient, gson, apiBase, this::mayTransmit);
+		detector = new SubmissionDetector(itemManager::canonicalize, id -> itemManager.getItemComposition(id).getName());
 		resetReadings();
+		executor.execute(this::openSubmissions);
 		panel = new FriendscapePanel(this::setSending, new FriendscapePanel.CardActions()
 		{
 			@Override
@@ -176,10 +209,37 @@ public class FriendscapePlugin extends Plugin
 		});
 	}
 
+	/** Opens the send queue, deleting files a previous run orphaned. Executor thread. */
+	private void openSubmissions()
+	{
+		try
+		{
+			sender = new SubmissionSender(SubmissionQueue.open(SUBMISSIONS_DIR, gson), api, new SubmissionSender.Listener()
+			{
+				@Override
+				public void tell(ProblemNotices.Notice notice)
+				{
+					FriendscapePlugin.this.tell(notice);
+				}
+
+				@Override
+				public void queueChanged()
+				{
+					refreshPanel();
+				}
+			});
+			refreshPanel();
+		}
+		catch (IOException e)
+		{
+			log.error("Cannot open the Submission queue in {}; drops will not be sent", SUBMISSIONS_DIR, e);
+		}
+	}
+
 	@Override
 	protected void shutDown()
 	{
-		api.cancelAll();
+		cancelAll();
 		clientToolbar.removeNavigation(navButton);
 		overlayManager.remove(overlay);
 		loggedIn = false;
@@ -204,10 +264,10 @@ public class FriendscapePlugin extends Plugin
 			case HOPPING:
 			case LOGGING_IN:
 				loggedIn = false;
-				api.cancelAll();
+				cancelAll();
 				break;
 			case LOGIN_SCREEN:
-				api.cancelAll();
+				cancelAll();
 				// The logout Reading: still permitted, as loggedIn only clears below
 				if (readingsWanted(Instant.now()))
 				{
@@ -242,7 +302,25 @@ public class FriendscapePlugin extends Plugin
 			refreshPanel();
 			discover();
 		}
+		detector.tick();
 		sendDueReadings(Instant.now());
+	}
+
+	/** NPC kills (SPEC 10.2). */
+	@Subscribe
+	public void onServerNpcLoot(ServerNpcLoot event)
+	{
+		capture(detector.loot(event.getItems()));
+	}
+
+	/** Raids, chests, clues, minigames and pickpockets, from the core Loot Tracker (SPEC 10.2). */
+	@Subscribe
+	public void onLootReceived(LootReceived event)
+	{
+		if (SubmissionDetector.countsLoot(event.getType()))
+		{
+			capture(detector.loot(event.getItems()));
+		}
 	}
 
 	@Subscribe
@@ -263,6 +341,10 @@ public class FriendscapePlugin extends Plugin
 			&& type != ChatMessageType.FRIENDSCHATNOTIFICATION)
 		{
 			return;
+		}
+		if (type == ChatMessageType.GAMEMESSAGE)
+		{
+			capture(detector.chat(event.getMessage()));
 		}
 		KcMessages.Kc kc = KcMessages.parse(event.getMessage());
 		if (kc != null && mayTransmit() && readingsWanted(Instant.now()))
@@ -296,7 +378,7 @@ public class FriendscapePlugin extends Plugin
 		}
 		else
 		{
-			api.cancelAll();
+			cancelAll();
 			connection = ConnectionStatus.CONNECTING;
 			resetReadings();
 		}
@@ -310,6 +392,114 @@ public class FriendscapePlugin extends Plugin
 		{
 			checkHealth();
 		}
+	}
+
+	/** Retries queued Submissions as their backoff allows (SPEC 10.5). */
+	@Schedule(period = 10, unit = ChronoUnit.SECONDS, asynchronous = true)
+	public void flushSubmissions()
+	{
+		SubmissionSender target = sender;
+		if (target == null || rsn == null || !mayTransmit())
+		{
+			return;
+		}
+		DiscoveryResponse found = discovery;
+		SubmissionSender.Context context = found == null
+			? new SubmissionSender.Context(Set.of(), Map.of(), config.chatOnCounted())
+			: new SubmissionSender.Context(found.muted(left()), found.eventNames(), config.chatOnCounted());
+		target.flush(accountHash, context, Instant.now());
+	}
+
+	/**
+	 * Captures watched drops (SPEC 5.4): one screenshot of the next frame for them all, then each
+	 * into the send queue. A failed screenshot still sends them, as needs evidence, and says so
+	 * loudly. Client thread.
+	 */
+	private void capture(List<SubmissionDetector.Drop> drops)
+	{
+		String name = rsn;
+		if (drops.isEmpty() || name == null || !mayTransmit())
+		{
+			return;
+		}
+		String capturedAt = Instant.now().toString();
+		List<QueuedSubmission> submissions = new ArrayList<>();
+		for (SubmissionDetector.Drop drop : drops)
+		{
+			submissions.add(new QueuedSubmission(UUID.randomUUID().toString(), Long.toString(accountHash), name,
+				drop.getKind().wire(), drop.getItemId(), drop.getName(),
+				drop.getQuantity(), capturedAt, new ArrayList<>(drop.getEvents())));
+		}
+		AtomicBoolean settled = new AtomicBoolean();
+		drawManager.requestNextFrameListener(image ->
+		{
+			if (settled.compareAndSet(false, true))
+			{
+				BufferedImage frame = ImageUtil.bufferedImageFromImage(image);
+				executor.execute(() -> queueCaptured(submissions, png(frame)));
+			}
+		});
+		executor.schedule(() ->
+		{
+			if (settled.compareAndSet(false, true))
+			{
+				log.warn("No frame drawn for a screenshot within {} s", SCREENSHOT_TIMEOUT_SECONDS);
+				queueCaptured(submissions, null);
+			}
+		}, SCREENSHOT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+	}
+
+	/** The frame as PNG, or null (logged) when it cannot be encoded. */
+	private static byte[] png(BufferedImage frame)
+	{
+		try
+		{
+			ByteArrayOutputStream out = new ByteArrayOutputStream();
+			if (ImageIO.write(frame, "png", out))
+			{
+				return out.toByteArray();
+			}
+			log.warn("No PNG writer for the screenshot");
+		}
+		catch (IOException e)
+		{
+			log.warn("Could not encode the screenshot", e);
+		}
+		return null;
+	}
+
+	/** Queues captured drops and sends them. Executor thread. */
+	private void queueCaptured(List<QueuedSubmission> submissions, byte[] png)
+	{
+		if (png == null)
+		{
+			for (QueuedSubmission submission : submissions)
+			{
+				tell(new ProblemNotices.Notice("Could not take a screenshot of " + submission.getName()
+					+ ". Upload one on the event page so it counts.", true));
+			}
+		}
+		SubmissionSender target = sender;
+		if (target == null)
+		{
+			log.warn("Submission queue unavailable; {} drop(s) not sent", submissions.size());
+			return;
+		}
+		try
+		{
+			target.add(submissions, png);
+		}
+		catch (IOException e)
+		{
+			log.error("Could not queue {} drop(s)", submissions.size(), e);
+			for (QueuedSubmission submission : submissions)
+			{
+				tell(new ProblemNotices.Notice("Could not save " + submission.getName()
+					+ " to send. Upload a screenshot on the event page to claim it.", true));
+			}
+			return;
+		}
+		flushSubmissions();
 	}
 
 	/** Cards and standings stay fresh while logged in (SPEC 10.3). */
@@ -466,6 +656,14 @@ public class FriendscapePlugin extends Plugin
 				return;
 			}
 			discovery = response;
+			long hash = accountHash;
+			WatchList watch = WatchList.of(response, left());
+			clientThread.invokeLater(() -> detector.setWatch(watch));
+			SubmissionSender target = sender;
+			if (target != null)
+			{
+				executor.execute(() -> target.prune(hash, response, Instant.now()));
+			}
 			scheduleMomentReading(response.asReadings(left()));
 			List<ProblemNotices.Notice> told = notices.check(response, left());
 			for (ProblemNotices.Notice notice : told)
@@ -523,6 +721,17 @@ public class FriendscapePlugin extends Plugin
 		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, LeftEvents.format(left));
 	}
 
+	/** Cancels every in-flight call; queued Submissions they carried are due again. */
+	private void cancelAll()
+	{
+		api.cancelAll();
+		SubmissionSender target = sender;
+		if (target != null)
+		{
+			target.cancelled();
+		}
+	}
+
 	private void resetReadings()
 	{
 		session.incrementAndGet();
@@ -532,6 +741,12 @@ public class FriendscapePlugin extends Plugin
 		momentReadingAt.set(null);
 		lastResponse = null;
 		discovery = null;
+		// Nothing is watched until discovery answers again
+		SubmissionDetector watching = detector;
+		if (watching != null)
+		{
+			clientThread.invokeLater(() -> watching.setWatch(WatchList.EMPTY));
+		}
 	}
 
 	/** The server's key for a skill, e.g. {@code runecraft}. */
@@ -585,7 +800,9 @@ public class FriendscapePlugin extends Plugin
 	private void refreshPanel()
 	{
 		DiscoveryResponse found = discovery;
-		List<EventCard> cards = found == null ? null : found.cards(left(), Instant.now(), ZoneId.systemDefault());
+		SubmissionSender queued = sender;
+		List<EventCard> cards = found == null ? null : found.cards(left(),
+			queued == null ? Map.of() : queued.queued(accountHash), Instant.now(), ZoneId.systemDefault());
 		FriendscapeOverlay shownOverlay = overlay;
 		if (shownOverlay != null)
 		{

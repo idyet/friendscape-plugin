@@ -34,7 +34,7 @@ public class FriendscapePanelTest
 
 	private static EventCard card(String slug, CardState state, List<String> standing)
 	{
-		return new EventCard(slug, "Event " + slug, state, "detail " + slug, standing, "");
+		return new EventCard(slug, "Event " + slug, state, "detail " + slug, standing, List.of(), "");
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -141,6 +141,15 @@ public class FriendscapePanelTest
 		assertEquals("Event a", first.name.getText());
 		assertEquals("detail a", first.detail.getText());
 		assertEquals(List.of("1st of 2, +5 xp"), first.standingTexts());
+	}
+
+	@Test
+	public void showsACardsNotesBelowItsStanding()
+	{
+		panel.update(discovered(new EventCard("a", "Event a", CardState.ATTENTION, "1 item needs a screenshot",
+			List.of("1st of 2, +5 xp"), List.of("Open event page to upload"), "")));
+
+		assertEquals(List.of("1st of 2, +5 xp", "Open event page to upload"), panel.cardViews.get(0).standingTexts());
 	}
 
 	@Test

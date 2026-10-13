@@ -27,7 +27,7 @@ public class EventCardTest
 
 	private static EventCard card(String extra)
 	{
-		return EventCard.of(event(extra), false, ZoneOffset.UTC);
+		return EventCard.of(event(extra), false, EventCard.Queued.NONE, ZoneOffset.UTC);
 	}
 
 	@Test
@@ -131,7 +131,7 @@ public class EventCardTest
 	@Test
 	public void greysALeftEventWhateverItsPhase()
 	{
-		EventCard card = EventCard.of(event("\"entry\":\"held\""), true, ZoneOffset.UTC);
+		EventCard card = EventCard.of(event("\"entry\":\"held\""), true, EventCard.Queued.NONE, ZoneOffset.UTC);
 
 		assertEquals(CardState.LEFT, card.getState());
 		assertTrue(card.isLeft());
@@ -149,9 +149,40 @@ public class EventCardTest
 	public void survivesFieldsMissingFromAnOlderServer()
 	{
 		EventCard card = EventCard.of(GSON.fromJson("{\"slug\":\"x\",\"name\":\"X\",\"phase\":\"live\"}",
-			DiscoveryResponse.DiscoveredEvent.class), false, ZoneOffset.UTC);
+			DiscoveryResponse.DiscoveredEvent.class), false, EventCard.Queued.NONE, ZoneOffset.UTC);
 
 		assertEquals(CardState.TRACKING, card.getState());
 		assertTrue(card.getStanding().isEmpty());
+	}
+
+	@Test
+	public void asksForAScreenshotWhileItemsNeedEvidence()
+	{
+		EventCard card = card("\"needsEvidence\":2");
+
+		assertEquals(CardState.ATTENTION, card.getState());
+		assertEquals("2 items need a screenshot", card.getDetail());
+		assertEquals(List.of("Open event page to upload"), card.getNotes());
+	}
+
+	@Test
+	public void keepsAskingForEvidenceAfterEnd()
+	{
+		// Uploads stay open through the Grace window and review
+		EventCard card = card("\"phase\":\"ended\",\"needsEvidence\":1");
+
+		assertEquals(CardState.ATTENTION, card.getState());
+		assertEquals("1 item needs a screenshot", card.getDetail());
+	}
+
+	@Test
+	public void showsWhatWaitsToSendAndWhatTheFullQueuePushedOut()
+	{
+		EventCard card = EventCard.of(event(""), false, new EventCard.Queued(3, 1), ZoneOffset.UTC);
+
+		assertEquals(CardState.TRACKING, card.getState());
+		assertEquals(List.of("3 waiting to send", "1 taken out of the full send queue: upload it on the event page"),
+			card.getNotes());
+		assertEquals(List.of(), card("").getNotes());
 	}
 }

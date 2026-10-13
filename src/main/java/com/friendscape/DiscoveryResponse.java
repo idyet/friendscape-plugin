@@ -5,7 +5,9 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import lombok.Value;
@@ -57,6 +59,31 @@ class DiscoveryResponse
 		List<TeamSize> teams;
 		/** Null without a metric, or while no Team counts the entry. */
 		Standing standing;
+		/** The player's Submissions here still waiting for a screenshot; absent from older servers. */
+		int needsEvidence;
+		/** What Tiles open for the player's Teams look for; null when nothing is open. */
+		Watch watch;
+	}
+
+	/**
+	 * The open-Tile watch list (SPEC 10.3): the union over the player's Teams. Hidden Tiles are
+	 * never in it, as the server redacts them.
+	 */
+	@Value
+	static class Watch
+	{
+		List<WatchedItem> items;
+		/** Some open Tile counts new collection log slots, whatever the item. */
+		boolean clogSlots;
+	}
+
+	@Value
+	static class WatchedItem
+	{
+		/** A canonical item id, as {@code ItemManager.canonicalize} gives it. */
+		int id;
+		/** The name chat lines use for it. */
+		String name;
 	}
 
 	@Value
@@ -87,13 +114,43 @@ class DiscoveryResponse
 		long gain;
 	}
 
-	private List<DiscoveredEvent> events()
+	/** The Events, empty when an older or broken answer has none. */
+	List<DiscoveredEvent> events()
 	{
 		return events == null ? List.of() : events;
 	}
 
-	/** One card per Event in the server's order, less Finalized ones past their week. */
-	List<EventCard> cards(Set<String> left, Instant now, ZoneId zone)
+	/** Event names by slug, for chat lines. */
+	Map<String, String> eventNames()
+	{
+		Map<String, String> names = new HashMap<>();
+		for (DiscoveredEvent event : events())
+		{
+			names.put(event.getSlug(), event.getName());
+		}
+		return names;
+	}
+
+	/**
+	 * Until when each Event may still count a queued Submission: its end plus Grace window, or
+	 * null while it has no end. An Event missing here no longer has a card.
+	 */
+	Map<String, Instant> keepUntil()
+	{
+		Map<String, Instant> keepUntil = new HashMap<>();
+		for (DiscoveredEvent event : events())
+		{
+			Instant endsAt = parse(event, event.getEndsAt());
+			keepUntil.put(event.getSlug(), endsAt == null ? null : endsAt.plusSeconds(event.getGraceWindowSeconds()));
+		}
+		return keepUntil;
+	}
+
+	/**
+	 * One card per Event in the server's order, less Finalized ones past their week.
+	 * {@code queued} holds this install's Submissions by Event slug.
+	 */
+	List<EventCard> cards(Set<String> left, Map<String, EventCard.Queued> queued, Instant now, ZoneId zone)
 	{
 		List<EventCard> cards = new ArrayList<>();
 		for (DiscoveredEvent event : events())
@@ -103,7 +160,8 @@ class DiscoveryResponse
 			{
 				continue;
 			}
-			cards.add(EventCard.of(event, left.contains(event.getSlug()), zone));
+			cards.add(EventCard.of(event, left.contains(event.getSlug()),
+				queued.getOrDefault(event.getSlug(), EventCard.Queued.NONE), zone));
 		}
 		return cards;
 	}

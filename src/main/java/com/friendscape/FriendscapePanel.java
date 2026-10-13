@@ -209,6 +209,13 @@ class FriendscapePanel extends PluginPanel
 				label.setForeground(card.isLeft() ? ColorScheme.MEDIUM_GRAY_COLOR : ColorScheme.LIGHT_GRAY_COLOR);
 				standing.add(label);
 			}
+			for (String line : card.getNotes())
+			{
+				JLabel label = new JLabel(line);
+				label.setFont(FontManager.getRunescapeSmallFont());
+				label.setForeground(CardState.ATTENTION.getColor());
+				standing.add(label);
+			}
 
 			JPopupMenu menu = new JPopupMenu();
 			menu.add(leaveItem);

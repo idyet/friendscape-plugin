@@ -14,6 +14,7 @@ import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
 import okhttp3.MediaType;
+import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
@@ -29,6 +30,7 @@ import okhttp3.ResponseBody;
 class FriendscapeApi
 {
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
+	private static final MediaType PNG = MediaType.get("image/png");
 
 	private final OkHttpClient http;
 	private final Gson gson;
@@ -139,6 +141,71 @@ class FriendscapeApi
 		}, error -> log.debug("Reading dropped: {}", error.getMessage()));
 	}
 
+	/** How a Submission send ended; called back on an OkHttp thread, not at all if refused here or cancelled. */
+	interface SubmissionCallback
+	{
+		/** The server took it: any outcome settles it. */
+		void answered(SubmissionResponse response);
+
+		/** The server refused it for good (a 4xx other than 408 and 429): resending would not help. */
+		void refused(int code);
+
+		/** No answer, a timeout, rate limit, server error or unreadable body: worth a retry. */
+		void failed();
+	}
+
+	/**
+	 * Sends an item, clog or pet Submission (SPEC 5.4) as multipart: the queued Submission's fields and
+	 * the screenshot, which is left out when capture failed. {@code muted} names the Events left on
+	 * this install. False when refused here, as sending is off: the callback never fires.
+	 */
+	boolean sendSubmission(QueuedSubmission submission, byte[] png, Set<String> muted, SubmissionCallback callback)
+	{
+		MultipartBody.Builder body = new MultipartBody.Builder()
+			.setType(MultipartBody.FORM)
+			.addFormDataPart("rsn", submission.getRsn())
+			.addFormDataPart("accountHash", submission.getAccountHash())
+			.addFormDataPart("idempotencyId", submission.getId())
+			.addFormDataPart("capturedAt", submission.getCapturedAt())
+			.addFormDataPart("kind", submission.getKind())
+			.addFormDataPart("quantity", Integer.toString(submission.getQuantity()));
+		if (submission.getItemId() != null)
+		{
+			body.addFormDataPart("itemId", Integer.toString(submission.getItemId()));
+		}
+		if (!muted.isEmpty())
+		{
+			body.addFormDataPart("muted", gson.toJson(muted));
+		}
+		if (png != null)
+		{
+			body.addFormDataPart("screenshot", "screenshot.png", RequestBody.create(PNG, png));
+		}
+		Request request = new Request.Builder()
+			.url(base.resolve("v1/plugin/submissions"))
+			.post(body.build())
+			.build();
+		return enqueue(request, response ->
+		{
+			int code = response.code();
+			// A timeout or rate limit is passing; any other 4xx would fail again
+			if (code >= 400 && code < 500 && code != 408 && code != 429)
+			{
+				callback.refused(code);
+				return;
+			}
+			SubmissionResponse parsed = parse(response, SubmissionResponse.class);
+			if (parsed == null)
+			{
+				callback.failed();
+			}
+			else
+			{
+				callback.answered(parsed);
+			}
+		}, error -> callback.failed());
+	}
+
 	/** The JSON body of a successful response, or null (logged) for an error status or bad body. */
 	private <T> T parse(Response response, Class<T> type)
 	{
@@ -170,12 +237,13 @@ class FriendscapeApi
 		}
 	}
 
-	private void enqueue(Request request, Consumer<Response> onResponse, Consumer<IOException> onFailure)
+	/** False when refused here: sending is off, logged out or the world is not tracked. */
+	private boolean enqueue(Request request, Consumer<Response> onResponse, Consumer<IOException> onFailure)
 	{
 		if (!permitted.getAsBoolean())
 		{
 			log.debug("Refused {} {}: sending is off or this world is not tracked", request.method(), request.url());
-			return;
+			return false;
 		}
 
 		Call call = http.newCall(request);
@@ -204,6 +272,7 @@ class FriendscapeApi
 				}
 			}
 		});
+		return true;
 	}
 
 	/** Removes the call from the in-flight set; true if its result should still be delivered. */

@@ -12,6 +12,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import okhttp3.HttpUrl;
 import okhttp3.Interceptor;
 import okhttp3.MediaType;
@@ -21,6 +23,7 @@ import okhttp3.Response;
 import okhttp3.ResponseBody;
 import okio.Buffer;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
@@ -352,6 +355,99 @@ public class FriendscapeApiTest
 
 		assertNull(discovered.get());
 		assertEquals(Boolean.TRUE, reachable.get());
+	}
+
+	private static final QueuedSubmission VISAGE = new QueuedSubmission("3f1c2a9e", "-4611686018427387904",
+		"Iron Man", "item", 11286, "Draconic visage", 2, "2026-11-03T12:00:00Z", List.of("bingo"));
+
+	/** What the send's callback heard: the answer, {@code refused:<code>} or {@code failed}. */
+	private Object sendSubmission(FriendscapeApi api, QueuedSubmission entry, byte[] png) throws InterruptedException
+	{
+		CountDownLatch done = new CountDownLatch(1);
+		AtomicReference<Object> result = new AtomicReference<>();
+		api.sendSubmission(entry, png, Set.of("left-one"), new FriendscapeApi.SubmissionCallback()
+		{
+			@Override
+			public void answered(SubmissionResponse response)
+			{
+				result.set(response);
+				done.countDown();
+			}
+
+			@Override
+			public void refused(int code)
+			{
+				result.set("refused:" + code);
+				done.countDown();
+			}
+
+			@Override
+			public void failed()
+			{
+				result.set("failed");
+				done.countDown();
+			}
+		});
+		done.await(2, TimeUnit.SECONDS);
+		return result.get();
+	}
+
+	/** A multipart text field's value, or null when absent. */
+	private static String formField(String body, String name)
+	{
+		Matcher field = Pattern.compile("name=\"" + name + "\"\r\n(?:[^\r\n]+\r\n)*\r\n([^\r\n]*)\r\n").matcher(body);
+		return field.find() ? field.group(1) : null;
+	}
+
+	@Test
+	public void submissionsSendTheFieldsAndScreenshotAsMultipart() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200,
+			"{\"rsn\":\"Iron Man\",\"duplicate\":false,\"events\":[{\"slug\":\"bingo\",\"status\":\"counted\"}]}"));
+
+		Object answer = sendSubmission(api, VISAGE, new byte[]{1, 2, 3});
+
+		assertEquals(List.of("https://friendscape.test/api/v1/plugin/submissions"), requestedUrls);
+		String body = requestBodies.get(0);
+		assertEquals("Iron Man", formField(body, "rsn"));
+		assertEquals("-4611686018427387904", formField(body, "accountHash"));
+		assertEquals("3f1c2a9e", formField(body, "idempotencyId"));
+		assertEquals("2026-11-03T12:00:00Z", formField(body, "capturedAt"));
+		assertEquals("item", formField(body, "kind"));
+		assertEquals("11286", formField(body, "itemId"));
+		assertEquals("2", formField(body, "quantity"));
+		assertEquals("[\"left-one\"]", formField(body, "muted"));
+		assertTrue(body.contains("name=\"screenshot\"; filename=\"screenshot.png\""));
+		assertTrue(body.contains("Content-Type: image/png"));
+		assertEquals("counted", ((SubmissionResponse) answer).getEvents().get(0).getStatus());
+	}
+
+	@Test
+	public void aSubmissionWithoutScreenshotOrItemIdLeavesThemOut() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"events\":[]}"));
+		QueuedSubmission slot = new QueuedSubmission("x", "7", "Iron Man", "clog_slot", null, "Dossier", 1,
+			"2026-11-03T12:00:00Z", List.of("bingo"));
+
+		sendSubmission(api, slot, null);
+
+		assertFalse(requestBodies.get(0).contains("screenshot"));
+		assertNull(formField(requestBodies.get(0), "itemId"));
+		assertEquals("clog_slot", formField(requestBodies.get(0), "kind"));
+	}
+
+	@Test
+	public void aRefusedSubmissionIsToldApartFromAFailedOne() throws InterruptedException
+	{
+		assertEquals("refused:400", sendSubmission(api(clientAnswering(400, "{}")), VISAGE, null));
+		// No screenshot storage yet, the server down, or a rate limit: worth a retry
+		assertEquals("failed", sendSubmission(api(clientAnswering(503, "{}")), VISAGE, null));
+		assertEquals("failed", sendSubmission(api(clientAnswering(429, "{}")), VISAGE, null));
+		Interceptor down = chain ->
+		{
+			throw new IOException("unreachable");
+		};
+		assertEquals("failed", sendSubmission(api(new OkHttpClient.Builder().addInterceptor(down).build()), VISAGE, null));
 	}
 
 	@Test
