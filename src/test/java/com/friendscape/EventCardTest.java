@@ -5,6 +5,8 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
@@ -162,7 +164,8 @@ public class EventCardTest
 
 		assertEquals(CardState.ATTENTION, card.getState());
 		assertEquals("2 items need a screenshot", card.getDetail());
-		assertEquals(List.of("Open event page to upload"), card.getNotes());
+		assertTrue(card.isUpload());
+		assertEquals(List.of(), card.getNotes());
 	}
 
 	@Test
@@ -183,6 +186,60 @@ public class EventCardTest
 		assertEquals(CardState.TRACKING, card.getState());
 		assertEquals(List.of("3 waiting to send", "1 taken out of the full send queue: upload it on the event page"),
 			card.getNotes());
+		assertTrue(card.isUpload());
 		assertEquals(List.of(), card("").getNotes());
+		assertFalse(card("").isUpload());
+	}
+
+	/** A Live bingo Event whose board is {@code size} squares a side, with Red the player's Team. */
+	private static EventCard bingo(int size, String extra)
+	{
+		StringBuilder tiles = new StringBuilder();
+		for (int i = 0; i < size * size; i++)
+		{
+			tiles.append(i == 0 ? "" : ",").append("{\"state\":\"open\",\"tier\":null,\"fill\":0}");
+		}
+		return card("\"format\":\"bingo\",\"standing\":null,\"board\":{\"size\":" + size + ",\"tiles\":[],\"teams\":["
+			+ "{\"teamId\":2,\"name\":\"Blue\",\"rank\":1,\"of\":3,\"points\":1200,\"mine\":false,\"tiles\":[" + tiles + "]},"
+			+ "{\"teamId\":1,\"name\":\"Red\",\"rank\":2,\"of\":3,\"points\":340,\"mine\":true,\"tiles\":[" + tiles + "]}]}"
+			+ (extra.isEmpty() ? "" : "," + extra));
+	}
+
+	@Test
+	public void showsTheBingoStandingOfThePlayersTeamInPoints()
+	{
+		EventCard card = bingo(5, "");
+
+		assertEquals(List.of("Red: 2nd of 3, 340 pts"), card.getStanding());
+		assertEquals("2nd/3", card.getRank());
+		assertEquals(5, card.miniBoard().getSize());
+		assertEquals("Open event page", card.getLink());
+	}
+
+	@Test
+	public void showsNoBingoStandingBeforeStartButTheBoardAlready()
+	{
+		EventCard card = bingo(5, "\"phase\":\"scheduled\"");
+
+		assertTrue(card.getStanding().isEmpty());
+		assertEquals("", card.getRank());
+		assertEquals(5, card.miniBoard().getSize());
+	}
+
+	@Test
+	public void leavesABoardLargerThanSevenToTheWebsite()
+	{
+		EventCard card = bingo(8, "");
+
+		assertNull(card.miniBoard());
+		assertEquals(List.of("Red: 2nd of 3, 340 pts"), card.getStanding());
+		assertEquals("Open board", card.getLink());
+	}
+
+	@Test
+	public void linksAMetricEventToItsPage()
+	{
+		assertNull(card("").getBoard());
+		assertEquals("Open event page", card("").getLink());
 	}
 }

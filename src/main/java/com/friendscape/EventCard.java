@@ -13,6 +13,10 @@ import lombok.Value;
 class EventCard
 {
 	private static final DateTimeFormatter STARTS = DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH);
+	/** Larger boards show only the standing line and "Open board" (SPEC 10.3). */
+	static final int MAX_MINI_BOARD = 7;
+	static final String OPEN_BOARD = "Open board";
+	static final String OPEN_EVENT_PAGE = "Open event page";
 
 	String slug;
 	String name;
@@ -25,6 +29,12 @@ class EventCard
 	List<String> notes;
 	/** The best Team's rank for the overlay, e.g. {@code 2nd/4}; empty without a standing. */
 	String rank;
+	/** A bingo Event's board; null on a metric Event. */
+	DiscoveryResponse.Board board;
+	/** The label of the link to the website: "Open board" for a board too large to draw, else "Open event page". */
+	String link;
+	/** Something here waits for a screenshot upload on the website. */
+	boolean upload;
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -46,18 +56,64 @@ class EventCard
 	static EventCard of(DiscoveryResponse.DiscoveredEvent event, boolean left, Queued queued, ZoneId zone)
 	{
 		CardState state = state(event, left);
-		boolean ranked = hasStanding(event);
-		return new EventCard(event.getSlug(), event.getName(), state, detail(event, state, zone),
-			ranked ? standing(event) : List.of(), notes(event, state, queued), ranked ? rank(event.getStanding()) : "");
+		DiscoveryResponse.Board board = event.getBoard();
+		boolean bingo = board != null;
+		List<String> standing = List.of();
+		String rank = "";
+		if (bingo && started(event))
+		{
+			standing = bingoStanding(board);
+			rank = bingoRank(board);
+		}
+		else if (hasStanding(event))
+		{
+			standing = standing(event);
+			rank = rank(event.getStanding());
+		}
+		boolean upload = (state == CardState.ATTENTION && event.getNeedsEvidence() > 0) || queued.getPushedOut() > 0;
+		return new EventCard(event.getSlug(), event.getName(), state, detail(event, state, zone), standing,
+			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload);
 	}
 
-	private static List<String> notes(DiscoveryResponse.DiscoveredEvent event, CardState state, Queued queued)
+	/** The mini board draws up to 7x7; larger ones are left to the website. */
+	static boolean drawn(DiscoveryResponse.Board board)
+	{
+		return board != null && board.side() > 0 && board.side() <= MAX_MINI_BOARD;
+	}
+
+	/** The board the card draws, or null. */
+	DiscoveryResponse.Board miniBoard()
+	{
+		return drawn(board) ? board : null;
+	}
+
+	/** One line per Team the player is on: "Red: 2nd of 3, 340 pts". */
+	private static List<String> bingoStanding(DiscoveryResponse.Board board)
+	{
+		List<String> lines = new ArrayList<>();
+		for (DiscoveryResponse.BoardTeam team : board.mine())
+		{
+			lines.add(team.getName() + ": " + bingoPlace(team));
+		}
+		return lines;
+	}
+
+	/** The best of the player's Teams; Teams come in standings order. */
+	private static String bingoRank(DiscoveryResponse.Board board)
+	{
+		List<DiscoveryResponse.BoardTeam> mine = board.mine();
+		return mine.isEmpty() ? "" : ordinal(mine.get(0).getRank()) + "/" + mine.get(0).getOf();
+	}
+
+	/** A bingo Team's place: "2nd of 3, 340 pts". */
+	static String bingoPlace(DiscoveryResponse.BoardTeam team)
+	{
+		return String.format(Locale.ENGLISH, "%s of %d, %,d pts", ordinal(team.getRank()), team.getOf(), team.getPoints());
+	}
+
+	private static List<String> notes(Queued queued)
 	{
 		List<String> notes = new ArrayList<>();
-		if (state == CardState.ATTENTION && event.getNeedsEvidence() > 0)
-		{
-			notes.add("Open event page to upload");
-		}
 		if (queued.getWaiting() > 0)
 		{
 			notes.add(queued.getWaiting() + " waiting to send");
@@ -136,10 +192,14 @@ class EventCard
 	/** Standings mean something once the Event has started. */
 	private static boolean hasStanding(DiscoveryResponse.DiscoveredEvent event)
 	{
+		return event.getStanding() != null && event.getStanding().getTeams() != null && started(event);
+	}
+
+	private static boolean started(DiscoveryResponse.DiscoveredEvent event)
+	{
 		String phase = event.getPhase();
-		return event.getStanding() != null && event.getStanding().getTeams() != null
-			&& (DiscoveryResponse.LIVE.equals(phase) || DiscoveryResponse.ENDED.equals(phase)
-			|| DiscoveryResponse.FINALIZED.equals(phase));
+		return DiscoveryResponse.LIVE.equals(phase) || DiscoveryResponse.ENDED.equals(phase)
+			|| DiscoveryResponse.FINALIZED.equals(phase);
 	}
 
 	private static List<String> standing(DiscoveryResponse.DiscoveredEvent event)

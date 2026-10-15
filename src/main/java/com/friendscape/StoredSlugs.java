@@ -5,10 +5,10 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Collectors;
 
-/** The stored list of Events left on this install: slugs, comma-separated (slugs have no commas). */
-final class LeftEvents
+/** A stored set of Event slugs, such as those left on this install: comma-separated (slugs have no commas). */
+final class StoredSlugs
 {
-	private LeftEvents()
+	private StoredSlugs()
 	{
 	}
 

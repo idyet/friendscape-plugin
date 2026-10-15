@@ -2,6 +2,7 @@ package com.friendscape;
 
 import com.google.gson.Gson;
 import com.google.inject.Provides;
+import java.awt.TrayIcon;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
 import javax.swing.SwingUtilities;
@@ -44,10 +46,17 @@ import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.config.FlashNotification;
+import net.runelite.client.config.Notification;
+import net.runelite.client.config.NotificationSound;
+import net.runelite.client.config.RequestFocusType;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.ServerNpcLoot;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.game.SkillIconManager;
+import net.runelite.client.game.SpriteManager;
+import net.runelite.client.hiscore.HiscoreSkill;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.loottracker.LootReceived;
@@ -56,6 +65,7 @@ import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.DrawManager;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.AsyncBufferedImage;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
@@ -76,6 +86,17 @@ public class FriendscapePlugin extends Plugin
 	private static final File SUBMISSIONS_DIR = new File(new File(RuneLite.RUNELITE_DIR, "friendscape"), "submissions");
 	/** A frame not drawn by then (client minimised, say) means the screenshot failed. */
 	private static final long SCREENSHOT_TIMEOUT_SECONDS = 5;
+	/** A Team completion's toast (SPEC 10.4): a tray message even while playing, with no sound. */
+	private static final Notification COMPLETION_TOAST = new Notification()
+		.withEnabled(true)
+		.withInitialized(true)
+		.withOverride(true)
+		.withTray(true)
+		.withTrayIconType(TrayIcon.MessageType.NONE)
+		.withRequestFocus(RequestFocusType.OFF)
+		.withSound(NotificationSound.OFF)
+		.withFlash(FlashNotification.DISABLED)
+		.withSendWhenFocused(true);
 
 	@Inject
 	private Client client;
@@ -114,6 +135,12 @@ public class FriendscapePlugin extends Plugin
 	private DrawManager drawManager;
 
 	@Inject
+	private SpriteManager spriteManager;
+
+	@Inject
+	private SkillIconManager skillIconManager;
+
+	@Inject
 	private ScheduledExecutorService executor;
 
 	private HttpUrl apiBase;
@@ -141,6 +168,7 @@ public class FriendscapePlugin extends Plugin
 	/** The last answer to discovery, null until one comes; the cards come from it. OkHttp threads. */
 	private volatile DiscoveryResponse discovery;
 	private final ProblemNotices notices = new ProblemNotices();
+	private final TeamCompletions completions = new TeamCompletions();
 	/** Fed on the client thread only; its watch is set there too, from any thread via invokeLater. */
 	private volatile SubmissionDetector detector;
 	/** Null until the queue opens on the executor, or for good if it cannot. */
@@ -184,7 +212,36 @@ public class FriendscapePlugin extends Plugin
 			{
 				LinkBrowser.browse(FriendscapeApi.eventPage(apiBase, slug));
 			}
-		});
+
+			@Override
+			public void openUploadPage(String slug)
+			{
+				LinkBrowser.browse(FriendscapeApi.uploadPage(apiBase, slug));
+			}
+
+			@Override
+			public void openBoard(String slug, int teamId)
+			{
+				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, slug, teamId));
+			}
+
+			@Override
+			public void openTile(String slug, int teamId, int number)
+			{
+				LinkBrowser.browse(FriendscapeApi.tilePage(apiBase, slug, teamId, number));
+			}
+
+			@Override
+			public void setBoardOpen(String slug, boolean open)
+			{
+				Set<String> closed = new HashSet<>(StoredSlugs.parse(config.closedBoards()));
+				if (open ? closed.remove(slug) : closed.add(slug))
+				{
+					configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.CLOSED_BOARDS,
+						StoredSlugs.format(closed));
+				}
+			}
+		}, this::loadTileIcon);
 		panel.setOnOpen(this::discover);
 		overlay = new FriendscapeOverlay(this, () -> config.overlay() && mayTransmit());
 		overlayManager.add(overlay);
@@ -248,6 +305,7 @@ public class FriendscapePlugin extends Plugin
 		connection = ConnectionStatus.CONNECTING;
 		resetReadings();
 		notices.reset();
+		completions.reset();
 		// api stays set: an async @Schedule tick racing shutdown must not hit null, and the gate refuses anyway
 		navButton = null;
 		panel = null;
@@ -277,8 +335,9 @@ public class FriendscapePlugin extends Plugin
 				rsn = null;
 				connection = ConnectionStatus.CONNECTING;
 				resetReadings();
-				// A new session: problems may be told again
+				// A new session: problems may be told again, boards are seen afresh
 				notices.reset();
+				completions.reset();
 				break;
 			default:
 				return;
@@ -670,6 +729,10 @@ public class FriendscapePlugin extends Plugin
 			{
 				tell(notice);
 			}
+			for (String completed : completions.check(response, left()))
+			{
+				celebrate(completed);
+			}
 			refreshPanel();
 		}, reachable ->
 		{
@@ -685,24 +748,83 @@ public class FriendscapePlugin extends Plugin
 	/** A chat line, red with the notifier for a problem (SPEC 10.4). */
 	private void tell(ProblemNotices.Notice notice)
 	{
-		String message = new ChatMessageBuilder()
-			.append(notice.isProblem() ? ChatColorType.HIGHLIGHT : ChatColorType.NORMAL)
-			.append("[Friendscape] " + notice.getText())
-			.build();
-		chatMessageManager.queue(QueuedMessage.builder()
-			.type(ChatMessageType.CONSOLE)
-			.runeLiteFormattedMessage(message)
-			.build());
+		chat(notice.getText(), notice.isProblem() ? ChatColorType.HIGHLIGHT : ChatColorType.NORMAL);
 		if (notice.isProblem() && config.notifyOnProblems())
 		{
 			notifier.notify("Friendscape: " + notice.getText());
 		}
 	}
 
+	private void chat(String text, ChatColorType color)
+	{
+		String message = new ChatMessageBuilder()
+			.append(color)
+			.append("[Friendscape] " + text)
+			.build();
+		chatMessageManager.queue(QueuedMessage.builder()
+			.type(ChatMessageType.CONSOLE)
+			.runeLiteFormattedMessage(message)
+			.build());
+	}
+
+	/** A Tile or Tier the player's Team completed (SPEC 10.4): a chat line, and a toast with no sound. */
+	private void celebrate(String text)
+	{
+		chat(text, ChatColorType.NORMAL);
+		if (config.toastOnCompletion())
+		{
+			notifier.notify(COMPLETION_TOAST, "Friendscape: " + text);
+		}
+	}
+
+	/**
+	 * A mini board square's picture (SPEC 10.3): the item sprite, the boss icon RuneLite's hiscores
+	 * use, or the skill icon. Nothing for a name this client does not know, so the Tile number shows.
+	 */
+	private void loadTileIcon(DiscoveryResponse.TileIcon icon, Consumer<BufferedImage> onLoaded)
+	{
+		if (icon.getKind() == null)
+		{
+			return;
+		}
+		switch (icon.getKind())
+		{
+			case DiscoveryResponse.TileIcon.ITEM:
+				AsyncBufferedImage image = itemManager.getImage(icon.getItemId());
+				onLoaded.accept(image);
+				image.onLoaded(() -> onLoaded.accept(image));
+				break;
+			case DiscoveryResponse.TileIcon.KC:
+				for (HiscoreSkill skill : HiscoreSkill.values())
+				{
+					if (skill.getName().equalsIgnoreCase(icon.getName()) && skill.getSpriteId() > 0)
+					{
+						spriteManager.getSpriteAsync(skill.getSpriteId(), 0, onLoaded);
+						return;
+					}
+				}
+				log.debug("No hiscores icon for {}", icon.getName());
+				break;
+			case DiscoveryResponse.TileIcon.XP:
+				for (Skill skill : Skill.values())
+				{
+					if (skillSlug(skill).equals(icon.getSkill()))
+					{
+						onLoaded.accept(skillIconManager.getSkillImage(skill, true));
+						return;
+					}
+				}
+				log.debug("No skill icon for {}", icon.getSkill());
+				break;
+			default:
+				break;
+		}
+	}
+
 	/** Events left on this install (SPEC 10.3): nothing more is sent for them. */
 	private Set<String> left()
 	{
-		return LeftEvents.parse(config.leftEvents());
+		return StoredSlugs.parse(config.leftEvents());
 	}
 
 	private void setLeft(String slug, boolean leave)
@@ -718,7 +840,7 @@ public class FriendscapePlugin extends Plugin
 			// Back in: the next Reading carries every skill, as at login
 			sendAllSkills = true;
 		}
-		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, LeftEvents.format(left));
+		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, StoredSlugs.format(left));
 	}
 
 	/** Cancels every in-flight call; queued Submissions they carried are due again. */
@@ -813,6 +935,7 @@ public class FriendscapePlugin extends Plugin
 			.rsn(rsn)
 			.status(status())
 			.cards(cards)
+			.closedBoards(StoredSlugs.parse(config.closedBoards()))
 			.build();
 		FriendscapePanel target = panel;
 		if (target != null)

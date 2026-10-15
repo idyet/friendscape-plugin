@@ -4,7 +4,9 @@ import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Font;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.swing.BorderFactory;
@@ -36,6 +38,18 @@ class FriendscapePanel extends PluginPanel
 		void rejoin(String slug);
 
 		void openEventPage(String slug);
+
+		/** The website's upload page, for screenshots the server still needs. */
+		void openUploadPage(String slug);
+
+		/** A Team's board page, for a board too large for the card. */
+		void openBoard(String slug, int teamId);
+
+		/** One Tile's detail on a Team's board page. */
+		void openTile(String slug, int teamId, int number);
+
+		/** Remembers whether a card's mini board is open, per Event. */
+		void setBoardOpen(String slug, boolean open);
 	}
 
 	static final String LEAVE_CONFIRM = "Stop sending for %s from this install?\n\n"
@@ -55,12 +69,16 @@ class FriendscapePanel extends PluginPanel
 
 	private final JPanel cards = new JPanel();
 	private final CardActions actions;
+	private final MiniBoardView.TileIcons icons;
+	/** The Team each mini board shows, by Event slug; kept across updates, not across restarts. */
+	private final Map<String, Integer> shownTeams = new HashMap<>();
 	/** Runs each time the panel is opened. */
 	private Runnable onOpen = () -> { };
 
-	FriendscapePanel(Consumer<Boolean> setSending, CardActions actions)
+	FriendscapePanel(Consumer<Boolean> setSending, CardActions actions, MiniBoardView.TileIcons icons)
 	{
 		this.actions = actions;
+		this.icons = icons;
 		setLayout(new BorderLayout());
 		setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
@@ -134,7 +152,7 @@ class FriendscapePanel extends PluginPanel
 		cardViews.clear();
 		for (EventCard card : shown)
 		{
-			CardView view = new CardView(card);
+			CardView view = new CardView(card, !state.getClosedBoards().contains(card.getSlug()));
 			cardViews.add(view);
 			cards.add(view);
 		}
@@ -154,6 +172,14 @@ class FriendscapePanel extends PluginPanel
 		onOpen.run();
 	}
 
+	/** The player's first Team, else the leader: what a mini board shows until a chip is chosen. */
+	private static int defaultTeam(DiscoveryResponse.Board board)
+	{
+		List<DiscoveryResponse.BoardTeam> mine = board.mine();
+		List<DiscoveryResponse.BoardTeam> teams = mine.isEmpty() ? board.teams() : mine;
+		return teams.isEmpty() ? 0 : teams.get(0).getTeamId();
+	}
+
 	private boolean askLeave(String eventName)
 	{
 		return JOptionPane.showConfirmDialog(this, String.format(LEAVE_CONFIRM, eventName), "Leave " + eventName,
@@ -166,12 +192,16 @@ class FriendscapePanel extends PluginPanel
 		final JLabel name = new JLabel();
 		final JLabel detail = new JLabel();
 		final JPanel standing = new JPanel();
-		final JButton openButton = new JButton("Open event page");
+		final JButton openButton = new JButton();
+		final JButton uploadButton = new JButton("Open event page to upload");
+		final JButton boardToggle = new JButton();
+		/** Null without a mini board. */
+		final MiniBoardView board;
 		final JButton rejoinButton = new JButton("Rejoin");
 		final JButton menuButton = new JButton("⋯");
 		final JMenuItem leaveItem = new JMenuItem("Leave");
 
-		CardView(EventCard card)
+		CardView(EventCard card, boolean boardOpen)
 		{
 			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 			setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -232,7 +262,33 @@ class FriendscapePanel extends PluginPanel
 			});
 			rejoinButton.setVisible(card.isLeft());
 			rejoinButton.addActionListener(e -> actions.rejoin(card.getSlug()));
-			openButton.addActionListener(e -> actions.openEventPage(card.getSlug()));
+			openButton.setText(card.getLink());
+			openButton.addActionListener(e ->
+			{
+				if (card.getBoard() != null && card.miniBoard() == null)
+				{
+					actions.openBoard(card.getSlug(), defaultTeam(card.getBoard()));
+				}
+				else
+				{
+					actions.openEventPage(card.getSlug());
+				}
+			});
+			uploadButton.setVisible(card.isUpload());
+			uploadButton.setAlignmentX(LEFT_ALIGNMENT);
+			uploadButton.addActionListener(e -> actions.openUploadPage(card.getSlug()));
+
+			board = card.miniBoard() == null ? null : miniBoard(card);
+			boardToggle.setVisible(board != null);
+			boardToggle.setAlignmentX(LEFT_ALIGNMENT);
+			boardToggle.setFocusable(false);
+			showBoard(boardOpen);
+			boardToggle.addActionListener(e ->
+			{
+				boolean open = !board.isVisible();
+				showBoard(open);
+				actions.setBoardOpen(card.getSlug(), open);
+			});
 
 			JPanel links = new JPanel(new BorderLayout(5, 0));
 			links.setOpaque(false);
@@ -244,7 +300,44 @@ class FriendscapePanel extends PluginPanel
 			add(title);
 			add(status);
 			add(standing);
+			add(uploadButton);
+			add(boardToggle);
+			if (board != null)
+			{
+				add(board);
+			}
 			add(links);
+		}
+
+		private MiniBoardView miniBoard(EventCard card)
+		{
+			String slug = card.getSlug();
+			Integer remembered = shownTeams.get(slug);
+			int teamId = remembered != null ? remembered : defaultTeam(card.miniBoard());
+			return new MiniBoardView(card.miniBoard(), teamId, icons, new MiniBoardView.Listener()
+			{
+				@Override
+				public void teamChosen(int chosen)
+				{
+					shownTeams.put(slug, chosen);
+				}
+
+				@Override
+				public void openTile(int shownTeam, int number)
+				{
+					actions.openTile(slug, shownTeam, number);
+				}
+			});
+		}
+
+		private void showBoard(boolean open)
+		{
+			if (board != null)
+			{
+				board.setVisible(open);
+				boardToggle.setText(open ? "Hide board" : "Show board");
+				revalidate();
+			}
 		}
 
 		List<String> standingTexts()

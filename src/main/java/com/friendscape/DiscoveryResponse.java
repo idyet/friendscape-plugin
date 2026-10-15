@@ -63,6 +63,126 @@ class DiscoveryResponse
 		int needsEvidence;
 		/** What Tiles open for the player's Teams look for; null when nothing is open. */
 		Watch watch;
+		/** A bingo Event's mini board with every Team's standing; null on a metric Event or older server. */
+		Board board;
+	}
+
+	/** A bingo Event's board as the mini board shows it (SPEC 10.3): what the website shows. */
+	@Value
+	static class Board
+	{
+		/** Squares per side. */
+		int size;
+		/** Stored Tiles only; a position without one shows empty. */
+		List<BoardTile> tiles;
+		/** Every Team, in standings order. */
+		List<BoardTeam> teams;
+
+		/** The Tile at a number, or null for an empty position. */
+		BoardTile tile(int number)
+		{
+			for (BoardTile tile : tiles == null ? List.<BoardTile>of() : tiles)
+			{
+				if (tile.getNumber() == number)
+				{
+					return tile;
+				}
+			}
+			return null;
+		}
+
+		List<BoardTeam> teams()
+		{
+			return teams == null ? List.of() : teams;
+		}
+
+		/** The Teams the player is on, best first. */
+		List<BoardTeam> mine()
+		{
+			List<BoardTeam> mine = new ArrayList<>();
+			for (BoardTeam team : teams())
+			{
+				if (team.isMine())
+				{
+					mine.add(team);
+				}
+			}
+			return mine;
+		}
+
+		/** Squares per side; 0 for a board too broken to draw. */
+		int side()
+		{
+			return Math.max(0, size);
+		}
+	}
+
+	@Value
+	static class BoardTile
+	{
+		/** From 1: position + 1, as the website names it. */
+		int number;
+		String name;
+		int tiers;
+		/** Null shows the Tile number. */
+		TileIcon icon;
+	}
+
+	/** The first Requirement's picture: an item sprite, a boss icon or a skill icon. */
+	@Value
+	static class TileIcon
+	{
+		static final String ITEM = "item";
+		static final String KC = "kc";
+		static final String XP = "xp";
+
+		String kind;
+		/** For {@code item}: a canonical item id. */
+		int itemId;
+		/** For {@code kc}: the activity as RuneLite's hiscores name it. */
+		String name;
+		/** For {@code xp}: the skill, e.g. {@code slayer}. */
+		String skill;
+	}
+
+	@Value
+	static class BoardTeam
+	{
+		int teamId;
+		String name;
+		int rank;
+		/** How many Teams the Event ranks. */
+		int of;
+		int points;
+		/** The player is on it now. */
+		boolean mine;
+		/** One per position, in order. */
+		List<TeamTile> tiles;
+
+		/** The highest Tier reached at a position, from 1; 0 when none is or out of range. */
+		int tier(int position)
+		{
+			if (tiles == null || position >= tiles.size() || tiles.get(position).getTier() == null)
+			{
+				return 0;
+			}
+			return tiles.get(position).getTier();
+		}
+	}
+
+	@Value
+	static class TeamTile
+	{
+		static final String COMPLETE = "complete";
+		static final String FREE = "free";
+		static final String EMPTY = "empty";
+
+		/** {@code empty}, {@code free}, {@code open} or {@code complete}. */
+		String state;
+		/** The highest Tier reached, from 1; null while none is. */
+		Integer tier;
+		/** 0 to 1: 1 when complete, else progress toward the next Tier. */
+		double fill;
 	}
 
 	/**

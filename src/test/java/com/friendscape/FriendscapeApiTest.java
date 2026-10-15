@@ -456,4 +456,12 @@ public class FriendscapeApiTest
 		assertEquals("https://friendscape.test/e/sotw-slayer", FriendscapeApi.eventPage(BASE, "sotw-slayer"));
 		assertEquals("https://friendscape.test/e/a%20b", FriendscapeApi.eventPage(BASE, "a b"));
 	}
+
+	@Test
+	public void uploadAndTilePagesHangOffTheEventPage()
+	{
+		assertEquals("https://friendscape.test/e/bingo/upload", FriendscapeApi.uploadPage(BASE, "bingo"));
+		assertEquals("https://friendscape.test/e/bingo/t/3", FriendscapeApi.teamPage(BASE, "bingo", 3));
+		assertEquals("https://friendscape.test/e/bingo/t/3?tile=12", FriendscapeApi.tilePage(BASE, "bingo", 3, 12));
+	}
 }

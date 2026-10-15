@@ -85,6 +85,30 @@ class FriendscapeApi
 		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).build().toString();
 	}
 
+	/** The website's upload page for an Event, for needs-evidence and manual uploads. */
+	static String uploadPage(HttpUrl base, String slug)
+	{
+		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).addPathSegment("upload").build().toString();
+	}
+
+	/** A Team's board page: {@code /e/<slug>/t/<team>}. */
+	static String teamPage(HttpUrl base, String slug, int teamId)
+	{
+		return teamPageUrl(base, slug, teamId).build().toString();
+	}
+
+	/** One Tile's detail on a Team's board page: {@code /e/<slug>/t/<team>?tile=<n>}. */
+	static String tilePage(HttpUrl base, String slug, int teamId, int number)
+	{
+		return teamPageUrl(base, slug, teamId).addQueryParameter("tile", Integer.toString(number)).build().toString();
+	}
+
+	private static HttpUrl.Builder teamPageUrl(HttpUrl base, String slug, int teamId)
+	{
+		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).addPathSegment("t")
+			.addPathSegment(Integer.toString(teamId)).query(null);
+	}
+
 	private static Map<String, Object> identity(String rsn, long accountHash)
 	{
 		Map<String, Object> body = new LinkedHashMap<>();

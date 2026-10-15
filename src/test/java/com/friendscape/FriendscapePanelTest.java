@@ -30,11 +30,36 @@ public class FriendscapePanelTest
 		{
 			actions.add("open " + slug);
 		}
-	});
+
+		@Override
+		public void openUploadPage(String slug)
+		{
+			actions.add("upload " + slug);
+		}
+
+		@Override
+		public void openBoard(String slug, int teamId)
+		{
+			actions.add("board " + slug + " team " + teamId);
+		}
+
+		@Override
+		public void openTile(String slug, int teamId, int number)
+		{
+			actions.add("tile " + slug + " team " + teamId + " #" + number);
+		}
+
+		@Override
+		public void setBoardOpen(String slug, boolean open)
+		{
+			actions.add((open ? "show board " : "hide board ") + slug);
+		}
+	}, MiniBoardView.TileIcons.NONE);
 
 	private static EventCard card(String slug, CardState state, List<String> standing)
 	{
-		return new EventCard(slug, "Event " + slug, state, "detail " + slug, standing, List.of(), "");
+		return new EventCard(slug, "Event " + slug, state, "detail " + slug, standing, List.of(), "", null,
+			EventCard.OPEN_EVENT_PAGE, false);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -147,9 +172,134 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard("a", "Event a", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), List.of("Open event page to upload"), "")));
+			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true)));
 
-		assertEquals(List.of("1st of 2, +5 xp", "Open event page to upload"), panel.cardViews.get(0).standingTexts());
+		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
+	}
+
+	@Test
+	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
+	{
+		panel.update(discovered(new EventCard("a", "Event a", CardState.ATTENTION, "1 item needs a screenshot",
+			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.uploadButton.isVisible());
+		view.uploadButton.doClick();
+
+		assertEquals(List.of("upload a"), actions);
+		assertFalse(panel.cardViews.isEmpty());
+		panel.update(discovered(card("b", CardState.TRACKING, List.of())));
+		assertFalse(panel.cardViews.get(0).uploadButton.isVisible());
+	}
+
+	/** A 2x2 board: Tile 1 and the free centre stand in for the rest; Red (id 1) is the player's. */
+	private static EventCard bingoCard()
+	{
+		String json = "{\"size\":2,\"tiles\":[{\"number\":1,\"name\":\"Blood shards\",\"tiers\":1},"
+			+ "{\"number\":2,\"name\":\"Vorkath\",\"tiers\":3}],\"teams\":["
+			+ "{\"teamId\":2,\"name\":\"Blue\",\"rank\":1,\"of\":2,\"points\":9,\"mine\":false,\"tiles\":["
+			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":1},{\"state\":\"open\",\"tier\":null,\"fill\":0},"
+			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]},"
+			+ "{\"teamId\":1,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":0,\"mine\":true,\"tiles\":["
+			+ "{\"state\":\"open\",\"tier\":null,\"fill\":0.5},{\"state\":\"open\",\"tier\":1,\"fill\":0.25},"
+			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
+		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
+		return new EventCard("b", "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
+			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false);
+	}
+
+	@Test
+	public void showsThePlayersTeamBoardFirstWithAChipPerTeam()
+	{
+		panel.update(discovered(bingoCard()));
+		MiniBoardView board = panel.cardViews.get(0).board;
+
+		assertTrue(board.isVisible());
+		assertEquals(1, board.shownTeam());
+		assertEquals(2, board.chips.size());
+		assertTrue(board.chips.get(1).isSelected());
+		assertEquals(4, board.cells.size());
+		assertEquals("<html>Tile 1: Blood shards<br>50%</html>", board.cells.get(0).tooltip());
+		assertEquals("<html>Tile 2: Vorkath<br>Tier 1 of 3, 25% to the next</html>", board.cells.get(1).tooltip());
+		assertEquals("Red: 2nd of 2, 0 pts", board.standing.getText());
+	}
+
+	@Test
+	public void opensThePlayersTeamBoardWhenTheBoardIsTooLargeToDraw()
+	{
+		EventCard small = bingoCard();
+		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
+		panel.update(discovered(new EventCard("b", "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), List.of(),
+			"", large, EventCard.OPEN_BOARD, false)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertEquals(null, view.board);
+		view.openButton.doClick();
+
+		assertEquals(List.of("board b team 1"), actions);
+	}
+
+	@Test
+	public void opensTheEventPageBesideAMiniBoard()
+	{
+		panel.update(discovered(bingoCard()));
+
+		panel.cardViews.get(0).openButton.doClick();
+
+		assertEquals(List.of("open b"), actions);
+	}
+
+	@Test
+	public void aChipSwitchesTeamsAndTheChoiceSurvivesAnUpdate()
+	{
+		panel.update(discovered(bingoCard()));
+
+		panel.cardViews.get(0).board.chips.get(0).doClick();
+		assertEquals("<html>Tile 1: Blood shards<br>Done</html>", panel.cardViews.get(0).board.cells.get(0).tooltip());
+		assertEquals("Blue: 1st of 2, 9 pts", panel.cardViews.get(0).board.standing.getText());
+
+		panel.update(discovered(bingoCard()));
+		assertEquals(2, panel.cardViews.get(0).board.shownTeam());
+	}
+
+	@Test
+	public void aClickOnATileOpensItForTheShownTeamButNotOnAnEmptySquare()
+	{
+		panel.update(discovered(bingoCard()));
+		MiniBoardView board = panel.cardViews.get(0).board;
+
+		board.cells.get(1).click();
+		board.cells.get(3).click();
+
+		assertEquals(List.of("tile b team 1 #2"), actions);
+		assertFalse(board.cells.get(3).opens());
+	}
+
+	@Test
+	public void theBoardCollapsesAndRemembersPerEvent()
+	{
+		panel.update(discovered(bingoCard()));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		view.boardToggle.doClick();
+
+		assertFalse(view.board.isVisible());
+		assertEquals("Show board", view.boardToggle.getText());
+		assertEquals(List.of("hide board b"), actions);
+
+		panel.update(PanelState.builder().sending(true).rsn("Iron Man").cards(List.of(bingoCard()))
+			.closedBoards(java.util.Set.of("b")).build());
+		assertFalse(panel.cardViews.get(0).board.isVisible());
+	}
+
+	@Test
+	public void aMetricCardHasNoBoard()
+	{
+		panel.update(discovered(card("a", CardState.TRACKING, List.of())));
+
+		assertEquals(null, panel.cardViews.get(0).board);
+		assertFalse(panel.cardViews.get(0).boardToggle.isVisible());
 	}
 
 	@Test
