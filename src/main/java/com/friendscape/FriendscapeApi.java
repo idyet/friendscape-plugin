@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import lombok.Value;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.Call;
 import okhttp3.Callback;
@@ -163,6 +164,48 @@ class FriendscapeApi
 				onResult.accept(parsed);
 			}
 		}, error -> log.debug("Reading dropped: {}", error.getMessage()));
+	}
+
+	static final String REPORT_FAILED = "Could not report to Friendscape. Try again later.";
+	static final String NOTHING_TO_REPORT = "Nothing held to report: it may be settled already.";
+	static final String TOO_MANY_REPORTS = "Too many reports from here. Try again in an hour.";
+
+	/** The server's answer to a report: {@code {"status", "message"}}. */
+	@Value
+	static class ReportAnswer
+	{
+		String status;
+		String message;
+	}
+
+	/**
+	 * "Report to Friendscape" on a held card (SPEC 10.3): asks the admin to look at the identity
+	 * mismatch over {@code rsn}, from the card of {@code slug}. {@code onMessage} hears what to tell
+	 * the player, on an OkHttp thread; nothing for a call refused here or cancelled.
+	 */
+	void report(String rsn, long accountHash, String slug, Consumer<String> onMessage)
+	{
+		Map<String, Object> body = identity(rsn, accountHash);
+		body.put("slug", slug);
+		Request request = new Request.Builder()
+			.url(base.resolve("v1/plugin/report"))
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		enqueue(request, response ->
+		{
+			if (response.code() == 404)
+			{
+				onMessage.accept(NOTHING_TO_REPORT);
+				return;
+			}
+			if (response.code() == 429)
+			{
+				onMessage.accept(TOO_MANY_REPORTS);
+				return;
+			}
+			ReportAnswer answer = parse(response, ReportAnswer.class);
+			onMessage.accept(answer == null || answer.getMessage() == null ? REPORT_FAILED : answer.getMessage());
+		}, error -> onMessage.accept(REPORT_FAILED));
 	}
 
 	/** How a Submission send ended; called back on an OkHttp thread, not at all if refused here or cancelled. */

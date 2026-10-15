@@ -95,7 +95,10 @@ public class EventCardTest
 	@Test
 	public void needsAttentionWhileAnIdentityMismatchIsHeld()
 	{
-		assertEquals(CardState.ATTENTION, card("\"entry\":\"held\"").getState());
+		EventCard held = card("\"entry\":\"held\"");
+		assertEquals(CardState.ATTENTION, held.getState());
+		assertTrue(held.isReport());
+		assertFalse(card("\"entry\":\"on_roster\"").isReport());
 	}
 
 	@Test

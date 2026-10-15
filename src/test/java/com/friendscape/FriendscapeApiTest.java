@@ -357,6 +357,38 @@ public class FriendscapeApiTest
 		assertEquals(Boolean.TRUE, reachable.get());
 	}
 
+	private String report(FriendscapeApi api) throws InterruptedException
+	{
+		CountDownLatch done = new CountDownLatch(1);
+		AtomicReference<String> told = new AtomicReference<>();
+		api.report("Iron Man", 7L, "sotw", message ->
+		{
+			told.set(message);
+			done.countDown();
+		});
+		done.await(2, TimeUnit.SECONDS);
+		return told.get();
+	}
+
+	@Test
+	public void aReportCarriesTheIdentityAndCardAndTellsTheServersAnswer() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"status\":\"already_reported\",\"message\":\"Already reported\"}"));
+
+		assertEquals("Already reported", report(api));
+		assertEquals(List.of("https://friendscape.test/api/v1/plugin/report"), requestedUrls);
+		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"slug\":\"sotw\"}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void aReportExplainsARefusalOrFailure() throws InterruptedException
+	{
+		assertEquals(FriendscapeApi.NOTHING_TO_REPORT, report(api(clientAnswering(404, "{}"))));
+		assertEquals(FriendscapeApi.TOO_MANY_REPORTS, report(api(clientAnswering(429, "{}"))));
+		assertEquals(FriendscapeApi.REPORT_FAILED, report(api(clientAnswering(502, "bad gateway"))));
+	}
+
 	private static final QueuedSubmission VISAGE = new QueuedSubmission("3f1c2a9e", "-4611686018427387904",
 		"Iron Man", "item", 11286, "Draconic visage", 2, "2026-11-03T12:00:00Z", List.of("bingo"));
 

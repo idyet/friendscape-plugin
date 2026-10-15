@@ -35,6 +35,8 @@ class EventCard
 	String link;
 	/** Something here waits for a screenshot upload on the website. */
 	boolean upload;
+	/** An identity mismatch is held here: the card offers "Report to Friendscape" (SPEC 10.3). */
+	boolean report;
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -71,8 +73,9 @@ class EventCard
 			rank = rank(event.getStanding());
 		}
 		boolean upload = (state == CardState.ATTENTION && event.getNeedsEvidence() > 0) || queued.getPushedOut() > 0;
+		boolean report = state == CardState.ATTENTION && DiscoveryResponse.HELD.equals(event.getEntry());
 		return new EventCard(event.getSlug(), event.getName(), state, detail(event, state, zone), standing,
-			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload);
+			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report);
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */

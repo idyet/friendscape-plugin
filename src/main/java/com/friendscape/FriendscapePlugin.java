@@ -220,6 +220,17 @@ public class FriendscapePlugin extends Plugin
 			}
 
 			@Override
+			public void report(String slug)
+			{
+				String name = rsn;
+				if (name == null)
+				{
+					return;
+				}
+				api.report(name, accountHash, slug, message -> chat(message, ChatColorType.NORMAL));
+			}
+
+			@Override
 			public void openBoard(String slug, int teamId)
 			{
 				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, slug, teamId));

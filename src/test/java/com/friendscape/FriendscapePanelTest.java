@@ -38,6 +38,12 @@ public class FriendscapePanelTest
 		}
 
 		@Override
+		public void report(String slug)
+		{
+			actions.add("report " + slug);
+		}
+
+		@Override
 		public void openBoard(String slug, int teamId)
 		{
 			actions.add("board " + slug + " team " + teamId);
@@ -59,7 +65,7 @@ public class FriendscapePanelTest
 	private static EventCard card(String slug, CardState state, List<String> standing)
 	{
 		return new EventCard(slug, "Event " + slug, state, "detail " + slug, standing, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false);
+			EventCard.OPEN_EVENT_PAGE, false, false);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -172,7 +178,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard("a", "Event a", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true)));
+			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -181,7 +187,7 @@ public class FriendscapePanelTest
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard("a", "Event a", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true)));
+			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -191,6 +197,23 @@ public class FriendscapePanelTest
 		assertFalse(panel.cardViews.isEmpty());
 		panel.update(discovered(card("b", CardState.TRACKING, List.of())));
 		assertFalse(panel.cardViews.get(0).uploadButton.isVisible());
+	}
+
+	@Test
+	public void offersReportOnAHeldCardOnce()
+	{
+		panel.update(discovered(new EventCard("a", "Event a", CardState.ATTENTION,
+			"On hold while Friendscape checks this RSN", List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
+			false, true)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.reportButton.isVisible());
+		view.reportButton.doClick();
+		view.reportButton.doClick();
+
+		assertEquals(List.of("report a"), actions);
+		panel.update(discovered(card("b", CardState.TRACKING, List.of())));
+		assertFalse(panel.cardViews.get(0).reportButton.isVisible());
 	}
 
 	/** A 2x2 board: Tile 1 and the free centre stand in for the rest; Red (id 1) is the player's. */
@@ -206,7 +229,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard("b", "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false);
+			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false);
 	}
 
 	@Test
@@ -231,7 +254,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard("b", "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), List.of(),
-			"", large, EventCard.OPEN_BOARD, false)));
+			"", large, EventCard.OPEN_BOARD, false, false)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);

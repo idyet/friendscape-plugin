@@ -42,6 +42,9 @@ class FriendscapePanel extends PluginPanel
 		/** The website's upload page, for screenshots the server still needs. */
 		void openUploadPage(String slug);
 
+		/** "Report to Friendscape": asks the admin to look at the card's held identity mismatch. */
+		void report(String slug);
+
 		/** A Team's board page, for a board too large for the card. */
 		void openBoard(String slug, int teamId);
 
@@ -194,6 +197,7 @@ class FriendscapePanel extends PluginPanel
 		final JPanel standing = new JPanel();
 		final JButton openButton = new JButton();
 		final JButton uploadButton = new JButton("Open event page to upload");
+		final JButton reportButton = new JButton("Report to Friendscape");
 		final JButton boardToggle = new JButton();
 		/** Null without a mini board. */
 		final MiniBoardView board;
@@ -277,6 +281,15 @@ class FriendscapePanel extends PluginPanel
 			uploadButton.setVisible(card.isUpload());
 			uploadButton.setAlignmentX(LEFT_ALIGNMENT);
 			uploadButton.addActionListener(e -> actions.openUploadPage(card.getSlug()));
+			reportButton.setVisible(card.isReport());
+			reportButton.setAlignmentX(LEFT_ALIGNMENT);
+			reportButton.setToolTipText("Tell Friendscape this RSN is yours; the answer comes in chat");
+			reportButton.addActionListener(e ->
+			{
+				// Once per card: a repeat within a day posts nothing anyway
+				reportButton.setEnabled(false);
+				actions.report(card.getSlug());
+			});
 
 			board = card.miniBoard() == null ? null : miniBoard(card);
 			boardToggle.setVisible(board != null);
@@ -301,6 +314,7 @@ class FriendscapePanel extends PluginPanel
 			add(status);
 			add(standing);
 			add(uploadButton);
+			add(reportButton);
 			add(boardToggle);
 			if (board != null)
 			{
