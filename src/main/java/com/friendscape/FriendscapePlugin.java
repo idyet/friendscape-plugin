@@ -81,7 +81,8 @@ public class FriendscapePlugin extends Plugin
 {
 	/** Developer override for the API base, e.g. {@code -Dfriendscape.apiBase=http://localhost:3000/api/}. */
 	static final String API_BASE_PROPERTY = "friendscape.apiBase";
-	private static final String DEFAULT_API_BASE = "https://www.friendscape.cc/api/";
+	/** Dev host until the final release; switch to {@code https://www.friendscape.cc/api/} then. */
+	private static final String DEFAULT_API_BASE = "https://dev.friendscape.cc/api/";
 	/** The send queue (SPEC 10.5), under {@code .runelite/friendscape/}. */
 	private static final File SUBMISSIONS_DIR = new File(new File(RuneLite.RUNELITE_DIR, "friendscape"), "submissions");
 	/** A frame not drawn by then (client minimised, say) means the screenshot failed. */
