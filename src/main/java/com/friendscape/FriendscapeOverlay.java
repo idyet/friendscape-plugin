@@ -8,7 +8,7 @@ import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.LineComponent;
 
-/** In-game list of each Event with its status dot and the player's rank (SPEC 10.3). */
+/** In-game list of each Event, its name colored by status, with the player's rank (SPEC 10.3). */
 class FriendscapeOverlay extends OverlayPanel
 {
 	private final BooleanSupplier shown;
@@ -37,7 +37,7 @@ class FriendscapeOverlay extends OverlayPanel
 		for (EventCard card : current)
 		{
 			panelComponent.getChildren().add(LineComponent.builder()
-				.left("● " + card.getName())
+				.left(card.getName())
 				.leftColor(card.getState().getColor())
 				.right(card.getRank())
 				.build());

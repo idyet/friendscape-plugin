@@ -60,7 +60,7 @@ class FriendscapePanel extends PluginPanel
 		+ "You can rejoin from this card at any time.";
 
 	final JCheckBox sendingToggle = new JCheckBox("Send data to Friendscape");
-	final JLabel statusDot = new JLabel("●");
+	final JLabel statusDot = new JLabel(Glyphs.dot());
 	final JLabel statusText = new JLabel();
 	final JLabel playingAs = new JLabel();
 	final JLabel disclosure = new JLabel("<html>" + FriendscapeConfig.WARNING + "</html>");
@@ -202,7 +202,7 @@ class FriendscapePanel extends PluginPanel
 		/** Null without a mini board. */
 		final MiniBoardView board;
 		final JButton rejoinButton = new JButton("Rejoin");
-		final JButton menuButton = new JButton("⋯");
+		final JButton menuButton = new JButton(Glyphs.more());
 		final JMenuItem leaveItem = new JMenuItem("Leave");
 
 		CardView(EventCard card, boolean boardOpen)
@@ -223,7 +223,7 @@ class FriendscapePanel extends PluginPanel
 			title.add(menuButton, BorderLayout.EAST);
 			title.setAlignmentX(LEFT_ALIGNMENT);
 
-			JLabel dot = new JLabel("●");
+			JLabel dot = new JLabel(Glyphs.dot());
 			dot.setForeground(card.getState().getColor());
 			detail.setText(card.getDetail());
 			detail.setFont(FontManager.getRunescapeSmallFont());
