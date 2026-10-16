@@ -43,6 +43,17 @@ public class EventCardTest
 	}
 
 	@Test
+	public void isLiveOnlyWhileTheEventIsLiveAndStillSending()
+	{
+		assertTrue(card("").isLive());
+		assertTrue(card("\"entry\":\"held\"").isLive());
+		assertFalse(card("\"phase\":\"scheduled\"").isLive());
+		assertFalse(card("\"phase\":\"ended\"").isLive());
+		assertFalse(card("\"entry\":\"removed\"").isLive());
+		assertFalse(EventCard.of(event(""), true, EventCard.Queued.NONE, ZoneOffset.UTC).isLive());
+	}
+
+	@Test
 	public void showsASoloStandingAsRankAndGainInKcForABossOfTheWeek()
 	{
 		EventCard card = card("\"format\":\"botw\",\"standing\":{\"gain\":51,"

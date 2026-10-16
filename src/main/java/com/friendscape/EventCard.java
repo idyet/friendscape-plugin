@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import lombok.Value;
 
-/** One Event card as the panel and overlay show it (SPEC 10.3): state, detail line and standing. */
+/** One Event card as the panel shows it, and the overlay while live (SPEC 10.3): state, detail line and standing. */
 @Value
 class EventCard
 {
@@ -37,6 +37,8 @@ class EventCard
 	boolean upload;
 	/** An identity mismatch is held here: the card offers "Report to Friendscape" (SPEC 10.3). */
 	boolean report;
+	/** Live, still on the Roster and not left: the only cards the overlay shows. */
+	boolean live;
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -74,8 +76,10 @@ class EventCard
 		}
 		boolean upload = (state == CardState.ATTENTION && event.getNeedsEvidence() > 0) || queued.getPushedOut() > 0;
 		boolean report = state == CardState.ATTENTION && DiscoveryResponse.HELD.equals(event.getEntry());
+		boolean live = DiscoveryResponse.LIVE.equals(event.getPhase()) && !left
+			&& !DiscoveryResponse.REMOVED.equals(event.getEntry());
 		return new EventCard(event.getSlug(), event.getName(), state, detail(event, state, zone), standing,
-			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report);
+			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live);
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */
