@@ -4,7 +4,7 @@ friendscape is not on the RuneLite Plugin Hub yet. Until it is, testers run a co
 
 You need:
 
-- The file `friendscape-1.0-SNAPSHOT-all.jar`, sent to you by the organizer. Only run a copy you got from them directly.
+- The file `friendscape-0.1.0-all.jar`, sent to you by the organizer. Only run a copy you got from them directly.
 - Java 11 or newer.
 - About 10 minutes the first time.
 
@@ -44,14 +44,14 @@ Put the jar somewhere easy, such as your Downloads folder. In a terminal:
 
 ```
 cd %USERPROFILE%\Downloads
-java -Dfriendscape.apiBase=https://dev.friendscape.cc/api/ -jar friendscape-1.0-SNAPSHOT-all.jar --debug
+java -Dfriendscape.apiBase=https://dev.friendscape.cc/api/ -jar friendscape-0.1.0-all.jar --debug
 ```
 
 **Mac**
 
 ```
 cd ~/Downloads
-java -Dfriendscape.apiBase=https://dev.friendscape.cc/api/ -jar friendscape-1.0-SNAPSHOT-all.jar --debug
+java -Dfriendscape.apiBase=https://dev.friendscape.cc/api/ -jar friendscape-0.1.0-all.jar --debug
 ```
 
 RuneLite opens. Keep the terminal window open while you play; closing it closes the client.

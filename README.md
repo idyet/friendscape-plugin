@@ -71,7 +71,7 @@ org.gradle.java.home=/path/to/jdk
 - `./gradlew run` launches RuneLite in developer mode with the plugin sideloaded.
 - `./gradlew runDev` does the same against the dev API host, `https://dev.friendscape.cc/api/`.
 - The API base defaults to `https://www.friendscape.cc/api/`. Point a build anywhere else with `-Dfriendscape.apiBase=<url>`.
-- Testers without the Plugin Hub build: `./gradlew shadowJar` (`build/libs/friendscape-1.0-SNAPSHOT-all.jar`), then follow [SIDELOAD.md](SIDELOAD.md).
+- Testers without the Plugin Hub build: `./gradlew shadowJar` (`build/libs/friendscape-0.1.0-all.jar`), then follow [SIDELOAD.md](SIDELOAD.md).
 
 The KC regexes are lifted from RuneLite (BSD-2, attribution in `KcMessages.java`). Product docs, the build spec and the backlog live in the Friendscape umbrella repo.
 
