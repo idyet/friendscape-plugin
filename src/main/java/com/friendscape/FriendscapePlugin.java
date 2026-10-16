@@ -74,8 +74,8 @@ import okhttp3.OkHttpClient;
 @Slf4j
 @PluginDescriptor(
 	name = "friendscape",
-	description = "Tracks your progress in Friendscape clan Events: bingo, Skill of the week, Boss of the week",
-	tags = {"bingo", "clan", "event", "sotw", "botw", "competition", "friendscape"}
+	description = "Tracks your progress in Friendscape Skill, Boss, or Bingo Events",
+	tags = {"friendscape", "clan", "bingo", "sotw", "skill of the week", "botw", "boss of the week", "event", "competition"}
 )
 public class FriendscapePlugin extends Plugin
 {

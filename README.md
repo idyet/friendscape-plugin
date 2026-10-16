@@ -1,6 +1,6 @@
 # friendscape
 
-Tracks your progress in Friendscape clan Events: bingo, Skill of the week, Boss of the week.
+Tracks your progress in Friendscape Skill, Boss, or Bingo Events.
 
 If you are on the roster of a Friendscape Event, this plugin sends the progress that Event counts to the Friendscape server: XP, kill counts, drops, new collection log slots and pets. The side panel and an optional overlay show each Event's status, your Team's standing and, for bingo, a mini board.
 
