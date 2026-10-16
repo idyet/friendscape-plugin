@@ -44,6 +44,23 @@ public class DiscoveryResponseTest
 	}
 
 	@Test
+	public void ordersCardsLiveThenScheduledThenFinishedThenLeft()
+	{
+		DiscoveryResponse response = parse(
+			event("left", "live", "on_roster", ""),
+			event("final", "finalized", "on_roster", "\"finalizedAt\":\"2026-11-02T12:00:00.000Z\""),
+			event("removed", "live", "removed", ""),
+			event("ended", "ended", "on_roster", ""),
+			event("unscheduled", "published", "on_roster", ""),
+			event("soon", "scheduled", "on_roster", ""),
+			event("live", "live", "on_roster", ""),
+			event("held", "live", "held", ""));
+
+		assertEquals(List.of("live", "held", "unscheduled", "soon", "ended", "final", "left", "removed"),
+			slugs(response.cards(Set.of("left"), Map.of(), NOW, ZoneOffset.UTC)));
+	}
+
+	@Test
 	public void removesAFinalizedCardSevenDaysAfterFinalize()
 	{
 		DiscoveryResponse response = parse(

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -267,13 +268,16 @@ class DiscoveryResponse
 	}
 
 	/**
-	 * One card per Event in the server's order, less Finalized ones past their week.
+	 * One card per Event, less Finalized ones past their week: live first, then scheduled, ended,
+	 * Finalized, and last those left or off the Roster, in the server's order within each.
 	 * {@code queued} holds this install's Submissions by Event slug.
 	 */
 	List<EventCard> cards(Set<String> left, Map<String, EventCard.Queued> queued, Instant now, ZoneId zone)
 	{
+		List<DiscoveredEvent> ordered = new ArrayList<>(events());
+		ordered.sort(Comparator.comparingInt(event -> cardOrder(event, left)));
 		List<EventCard> cards = new ArrayList<>();
-		for (DiscoveredEvent event : events())
+		for (DiscoveredEvent event : ordered)
 		{
 			Instant finalizedAt = parse(event, event.getFinalizedAt());
 			if (finalizedAt != null && !now.isBefore(finalizedAt.plus(FINALIZED_VISIBLE)))
@@ -284,6 +288,24 @@ class DiscoveryResponse
 				queued.getOrDefault(event.getSlug(), EventCard.Queued.NONE), zone));
 		}
 		return cards;
+	}
+
+	private static int cardOrder(DiscoveredEvent event, Set<String> left)
+	{
+		if (left.contains(event.getSlug()) || REMOVED.equals(event.getEntry()))
+		{
+			return 4;
+		}
+		String phase = event.getPhase();
+		if (SCHEDULED.equals(phase) || PUBLISHED.equals(phase))
+		{
+			return 1;
+		}
+		if (ENDED.equals(phase))
+		{
+			return 2;
+		}
+		return FINALIZED.equals(phase) ? 3 : 0;
 	}
 
 	/**
