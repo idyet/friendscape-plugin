@@ -19,7 +19,7 @@ public class TeamCompletionsTest
 	 */
 	private static DiscoveryResponse discovery(int[] red, int[] blue)
 	{
-		String json = "{\"events\":[{\"slug\":\"bingo\",\"name\":\"Autumn bingo\",\"format\":\"bingo\","
+		String json = "{\"events\":[{\"number\":123456,\"name\":\"Autumn bingo\",\"format\":\"bingo\","
 			+ "\"phase\":\"live\",\"entry\":\"on_roster\",\"board\":{\"size\":2,\"tiles\":["
 			+ "{\"number\":1,\"name\":\"Blood shards\",\"tiers\":1},"
 			+ "{\"number\":2,\"name\":\"Vorkath\",\"tiers\":3}],\"teams\":["
@@ -89,7 +89,7 @@ public class TeamCompletionsTest
 	{
 		completions.check(discovery(new int[]{}, new int[]{}), Set.of());
 
-		assertTrue(completions.check(discovery(new int[]{1}, new int[]{}), Set.of("bingo")).isEmpty());
+		assertTrue(completions.check(discovery(new int[]{1}, new int[]{}), Set.of(123456)).isEmpty());
 	}
 
 	@Test

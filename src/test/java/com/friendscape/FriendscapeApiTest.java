@@ -210,13 +210,13 @@ public class FriendscapeApiTest
 	}
 
 	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp, Set<Moment> moments,
-		Set<String> muted) throws InterruptedException
+		Set<Integer> muted) throws InterruptedException
 	{
 		return sendReadings(api, xp, Map.of(), moments, muted);
 	}
 
 	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp, Map<String, Long> kcChat,
-		Set<Moment> moments, Set<String> muted) throws InterruptedException
+		Set<Moment> moments, Set<Integer> muted) throws InterruptedException
 	{
 		CountDownLatch done = new CountDownLatch(1);
 		AtomicReference<ReadingsResponse> result = new AtomicReference<>();
@@ -271,7 +271,7 @@ public class FriendscapeApiTest
 	public void readingsAnswerWithEachEventStatus() throws InterruptedException
 	{
 		FriendscapeApi api = api(clientAnswering(200,
-			"{\"rsn\":\"Iron Man\",\"events\":[{\"slug\":\"sotw\",\"status\":\"ended\",\"startsAt\":null,\"endsAt\":null}]}"));
+			"{\"rsn\":\"Iron Man\",\"events\":[{\"number\":123456,\"status\":\"ended\",\"startsAt\":null,\"endsAt\":null}]}"));
 
 		ReadingsResponse response = sendReadings(api, Map.of("attack", 1L));
 
@@ -292,11 +292,11 @@ public class FriendscapeApiTest
 	{
 		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
 
-		sendReadings(api, Map.of("overall", 1L), Set.of(), new java.util.TreeSet<>(Set.of("b", "a")));
+		sendReadings(api, Map.of("overall", 1L), Set.of(), new java.util.TreeSet<>(Set.of(654321, 123456)));
 
 		assertEquals(
 			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"xp\":{\"overall\":1},"
-				+ "\"muted\":[\"a\",\"b\"]}"),
+				+ "\"muted\":[123456,654321]}"),
 			json(requestBodies.get(0)));
 	}
 
@@ -324,7 +324,7 @@ public class FriendscapeApiTest
 	@Test
 	public void discoveryCarriesTheIdentityAndAnswersTheEvents() throws InterruptedException
 	{
-		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[{\"slug\":\"sotw\","
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[{\"number\":123456,"
 			+ "\"standing\":{\"gain\":5,\"teams\":[{\"name\":\"Iron Man\",\"solo\":true,\"rank\":1,\"of\":2,\"gain\":5}]}}]}"));
 
 		discover(api);
@@ -361,7 +361,7 @@ public class FriendscapeApiTest
 	{
 		CountDownLatch done = new CountDownLatch(1);
 		AtomicReference<String> told = new AtomicReference<>();
-		api.report("Iron Man", 7L, "sotw", message ->
+		api.report("Iron Man", 7L, 123456, message ->
 		{
 			told.set(message);
 			done.countDown();
@@ -377,7 +377,7 @@ public class FriendscapeApiTest
 
 		assertEquals("Already reported", report(api));
 		assertEquals(List.of("https://friendscape.test/api/v1/plugin/report"), requestedUrls);
-		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"slug\":\"sotw\"}"),
+		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"number\":123456}"),
 			json(requestBodies.get(0)));
 	}
 
@@ -390,14 +390,14 @@ public class FriendscapeApiTest
 	}
 
 	private static final QueuedSubmission VISAGE = new QueuedSubmission("3f1c2a9e", "-4611686018427387904",
-		"Iron Man", "item", 11286, "Draconic visage", 2, "2026-11-03T12:00:00Z", List.of("bingo"));
+		"Iron Man", "item", 11286, "Draconic visage", 2, "2026-11-03T12:00:00Z", List.of(123456));
 
 	/** What the send's callback heard: the answer, {@code refused:<code>} or {@code failed}. */
 	private Object sendSubmission(FriendscapeApi api, QueuedSubmission entry, byte[] png) throws InterruptedException
 	{
 		CountDownLatch done = new CountDownLatch(1);
 		AtomicReference<Object> result = new AtomicReference<>();
-		api.sendSubmission(entry, png, Set.of("left-one"), new FriendscapeApi.SubmissionCallback()
+		api.sendSubmission(entry, png, Set.of(654321), new FriendscapeApi.SubmissionCallback()
 		{
 			@Override
 			public void answered(SubmissionResponse response)
@@ -435,7 +435,7 @@ public class FriendscapeApiTest
 	public void submissionsSendTheFieldsAndScreenshotAsMultipart() throws InterruptedException
 	{
 		FriendscapeApi api = api(clientAnswering(200,
-			"{\"rsn\":\"Iron Man\",\"duplicate\":false,\"events\":[{\"slug\":\"bingo\",\"status\":\"counted\"}]}"));
+			"{\"rsn\":\"Iron Man\",\"duplicate\":false,\"events\":[{\"number\":123456,\"status\":\"counted\"}]}"));
 
 		Object answer = sendSubmission(api, VISAGE, new byte[]{1, 2, 3});
 
@@ -448,7 +448,7 @@ public class FriendscapeApiTest
 		assertEquals("item", formField(body, "kind"));
 		assertEquals("11286", formField(body, "itemId"));
 		assertEquals("2", formField(body, "quantity"));
-		assertEquals("[\"left-one\"]", formField(body, "muted"));
+		assertEquals("[654321]", formField(body, "muted"));
 		assertTrue(body.contains("name=\"screenshot\"; filename=\"screenshot.png\""));
 		assertTrue(body.contains("Content-Type: image/png"));
 		assertEquals("counted", ((SubmissionResponse) answer).getEvents().get(0).getStatus());
@@ -459,7 +459,7 @@ public class FriendscapeApiTest
 	{
 		FriendscapeApi api = api(clientAnswering(200, "{\"events\":[]}"));
 		QueuedSubmission slot = new QueuedSubmission("x", "7", "Iron Man", "clog_slot", null, "Dossier", 1,
-			"2026-11-03T12:00:00Z", List.of("bingo"));
+			"2026-11-03T12:00:00Z", List.of(123456));
 
 		sendSubmission(api, slot, null);
 
@@ -485,15 +485,14 @@ public class FriendscapeApiTest
 	@Test
 	public void eventPagesLiveBesideTheApi()
 	{
-		assertEquals("https://friendscape.test/e/sotw-slayer", FriendscapeApi.eventPage(BASE, "sotw-slayer"));
-		assertEquals("https://friendscape.test/e/a%20b", FriendscapeApi.eventPage(BASE, "a b"));
+		assertEquals("https://friendscape.test/e/123456", FriendscapeApi.eventPage(BASE, 123456));
 	}
 
 	@Test
 	public void uploadAndTilePagesHangOffTheEventPage()
 	{
-		assertEquals("https://friendscape.test/e/bingo/upload", FriendscapeApi.uploadPage(BASE, "bingo"));
-		assertEquals("https://friendscape.test/e/bingo/t/3", FriendscapeApi.teamPage(BASE, "bingo", 3));
-		assertEquals("https://friendscape.test/e/bingo/t/3?tile=12", FriendscapeApi.tilePage(BASE, "bingo", 3, 12));
+		assertEquals("https://friendscape.test/e/123456/upload", FriendscapeApi.uploadPage(BASE, 123456));
+		assertEquals("https://friendscape.test/e/123456/t/3", FriendscapeApi.teamPage(BASE, 123456, 3));
+		assertEquals("https://friendscape.test/e/123456/t/3?tile=12", FriendscapeApi.tilePage(BASE, 123456, 3, 12));
 	}
 }

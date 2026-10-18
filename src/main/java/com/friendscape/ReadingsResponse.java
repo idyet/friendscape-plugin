@@ -35,7 +35,7 @@ class ReadingsResponse
 	@Value
 	static class EventReading
 	{
-		String slug;
+		int number;
 		/** {@code counted}, {@code not_started}, {@code ended}, {@code held} or {@code not_on_roster}. */
 		String status;
 		String startsAt;
@@ -43,7 +43,7 @@ class ReadingsResponse
 	}
 
 	/** This answer less the Events the player left: no start or end Reading is sent for them. */
-	ReadingsResponse without(Set<String> left)
+	ReadingsResponse without(Set<Integer> left)
 	{
 		if (events == null || left.isEmpty())
 		{
@@ -52,7 +52,7 @@ class ReadingsResponse
 		List<EventReading> kept = new ArrayList<>();
 		for (EventReading event : events)
 		{
-			if (!left.contains(event.getSlug()))
+			if (!left.contains(event.getNumber()))
 			{
 				kept.add(event);
 			}
@@ -60,15 +60,15 @@ class ReadingsResponse
 		return new ReadingsResponse(rsn, kept);
 	}
 
-	/** The status this answer gives each Event, by slug. */
-	Map<String, String> statuses()
+	/** The status this answer gives each Event, by Event number. */
+	Map<Integer, String> statuses()
 	{
-		Map<String, String> statuses = new HashMap<>();
+		Map<Integer, String> statuses = new HashMap<>();
 		if (events != null)
 		{
 			for (EventReading event : events)
 			{
-				statuses.put(event.getSlug(), event.getStatus());
+				statuses.put(event.getNumber(), event.getStatus());
 			}
 		}
 		return statuses;
@@ -148,7 +148,7 @@ class ReadingsResponse
 		}
 		catch (DateTimeParseException e)
 		{
-			log.warn("Ignoring Event {} with an unreadable moment {}", event.getSlug(), at);
+			log.warn("Ignoring Event {} with an unreadable moment {}", event.getNumber(), at);
 			return null;
 		}
 	}

@@ -13,16 +13,16 @@ import java.util.Set;
  */
 class TeamCompletions
 {
-	/** The Tier each Team last had per position, by Event slug and Team id. */
+	/** The Tier each Team last had per position, by Event number and Team id. */
 	private final Map<String, int[]> seen = new HashMap<>();
 
-	synchronized List<String> check(DiscoveryResponse discovery, Set<String> left)
+	synchronized List<String> check(DiscoveryResponse discovery, Set<Integer> left)
 	{
 		List<String> told = new ArrayList<>();
 		for (DiscoveryResponse.DiscoveredEvent event : discovery.events())
 		{
 			DiscoveryResponse.Board board = event.getBoard();
-			if (board == null || left.contains(event.getSlug()))
+			if (board == null || left.contains(event.getNumber()))
 			{
 				continue;
 			}
@@ -33,7 +33,7 @@ class TeamCompletions
 				{
 					tiers[position] = team.tier(position);
 				}
-				int[] before = seen.put(event.getSlug() + ":" + team.getTeamId(), tiers);
+				int[] before = seen.put(event.getNumber() + ":" + team.getTeamId(), tiers);
 				if (before == null || before.length != tiers.length)
 				{
 					continue;

@@ -23,7 +23,7 @@ class ProblemNotices
 
 	private final Set<String> told = new HashSet<>();
 
-	synchronized List<Notice> check(DiscoveryResponse discovery, Set<String> left)
+	synchronized List<Notice> check(DiscoveryResponse discovery, Set<Integer> left)
 	{
 		List<Notice> notices = new ArrayList<>();
 		if (discovery.getEvents() == null)
@@ -32,17 +32,17 @@ class ProblemNotices
 		}
 		for (DiscoveryResponse.DiscoveredEvent event : discovery.getEvents())
 		{
-			if (left.contains(event.getSlug()))
+			if (left.contains(event.getNumber()))
 			{
 				continue;
 			}
 			String entry = event.getEntry();
-			if (DiscoveryResponse.HELD.equals(entry) && told.add(event.getSlug() + ":" + entry))
+			if (DiscoveryResponse.HELD.equals(entry) && told.add(event.getNumber() + ":" + entry))
 			{
 				notices.add(new Notice("Your progress in " + event.getName()
 					+ " is on hold while Friendscape checks this RSN's identity.", true));
 			}
-			else if (DiscoveryResponse.REMOVED.equals(entry) && told.add(event.getSlug() + ":" + entry))
+			else if (DiscoveryResponse.REMOVED.equals(entry) && told.add(event.getNumber() + ":" + entry))
 			{
 				notices.add(new Notice("You are no longer on the roster for " + event.getName() + ".", false));
 			}

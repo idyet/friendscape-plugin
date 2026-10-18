@@ -13,14 +13,15 @@ public class ProblemNoticesTest
 
 	private final ProblemNotices notices = new ProblemNotices();
 
-	private static DiscoveryResponse discovery(String... slugAndEntry)
+	/** Pairs of Event number and Roster entry state. */
+	private static DiscoveryResponse discovery(Object... numberAndEntry)
 	{
 		StringBuilder events = new StringBuilder();
-		for (int i = 0; i < slugAndEntry.length; i += 2)
+		for (int i = 0; i < numberAndEntry.length; i += 2)
 		{
-			events.append(i == 0 ? "" : ",").append("{\"slug\":\"").append(slugAndEntry[i])
-				.append("\",\"name\":\"Event ").append(slugAndEntry[i])
-				.append("\",\"phase\":\"live\",\"entry\":\"").append(slugAndEntry[i + 1]).append("\"}");
+			events.append(i == 0 ? "" : ",").append("{\"number\":").append(numberAndEntry[i])
+				.append(",\"name\":\"Event ").append(numberAndEntry[i])
+				.append("\",\"phase\":\"live\",\"entry\":\"").append(numberAndEntry[i + 1]).append("\"}");
 		}
 		return GSON.fromJson("{\"events\":[" + events + "]}", DiscoveryResponse.class);
 	}
@@ -28,46 +29,46 @@ public class ProblemNoticesTest
 	@Test
 	public void warnsOfAHeldMismatchOncePerSessionInRedWithTheNotifier()
 	{
-		List<ProblemNotices.Notice> first = notices.check(discovery("a", "held"), Set.of());
-		List<ProblemNotices.Notice> again = notices.check(discovery("a", "held"), Set.of());
+		List<ProblemNotices.Notice> first = notices.check(discovery(111111, "held"), Set.of());
+		List<ProblemNotices.Notice> again = notices.check(discovery(111111, "held"), Set.of());
 
 		assertEquals(1, first.size());
 		assertTrue(first.get(0).isProblem());
-		assertTrue(first.get(0).getText().contains("Event a"));
+		assertTrue(first.get(0).getText().contains("Event 111111"));
 		assertTrue(again.isEmpty());
 	}
 
 	@Test
 	public void saysNotOnRosterOncePerSessionQuietly()
 	{
-		List<ProblemNotices.Notice> first = notices.check(discovery("a", "removed"), Set.of());
+		List<ProblemNotices.Notice> first = notices.check(discovery(111111, "removed"), Set.of());
 
 		assertEquals(1, first.size());
 		assertEquals(false, first.get(0).isProblem());
-		assertTrue(notices.check(discovery("a", "removed"), Set.of()).isEmpty());
+		assertTrue(notices.check(discovery(111111, "removed"), Set.of()).isEmpty());
 	}
 
 	@Test
 	public void saysNothingForTrackedOrLeftEvents()
 	{
-		assertTrue(notices.check(discovery("a", "on_roster", "b", "held"), Set.of("b")).isEmpty());
+		assertTrue(notices.check(discovery(111111, "on_roster", 222222, "held"), Set.of(222222)).isEmpty());
 	}
 
 	@Test
 	public void warnsAgainInANewSession()
 	{
-		notices.check(discovery("a", "held"), Set.of());
+		notices.check(discovery(111111, "held"), Set.of());
 
 		notices.reset();
 
-		assertEquals(1, notices.check(discovery("a", "held"), Set.of()).size());
+		assertEquals(1, notices.check(discovery(111111, "held"), Set.of()).size());
 	}
 
 	@Test
 	public void warnsPerEvent()
 	{
-		notices.check(discovery("a", "held"), Set.of());
+		notices.check(discovery(111111, "held"), Set.of());
 
-		assertEquals(1, notices.check(discovery("a", "held", "b", "held"), Set.of()).size());
+		assertEquals(1, notices.check(discovery(111111, "held", 222222, "held"), Set.of()).size());
 	}
 }

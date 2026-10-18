@@ -24,7 +24,7 @@ class SubmissionResponse
 	@Value
 	static class EventOutcome
 	{
-		String slug;
+		int number;
 		/**
 		 * {@code counted}, {@code needs_evidence}, {@code pending}, {@code held}, {@code rejected},
 		 * or a refusal that stored nothing: {@code not_started}, {@code ended}, {@code not_on_roster}.
@@ -39,9 +39,9 @@ class SubmissionResponse
 	 * several count it, one per review and one per rejection with its reason. Held shows through
 	 * discovery, needs evidence when the screenshot failed.
 	 *
-	 * @param eventNames Event names by slug, from discovery; the slug stands in for an unknown one
+	 * @param eventNames Event names by Event number, from discovery; "Event <number>" stands in for an unknown one
 	 */
-	List<ProblemNotices.Notice> notices(QueuedSubmission submission, Map<String, String> eventNames, boolean chatOnCounted)
+	List<ProblemNotices.Notice> notices(QueuedSubmission submission, Map<Integer, String> eventNames, boolean chatOnCounted)
 	{
 		String what = submission.isClogSlot()
 			? "New collection log slot (" + submission.getName() + ")" : submission.getName();
@@ -49,7 +49,7 @@ class SubmissionResponse
 		List<ProblemNotices.Notice> notices = new ArrayList<>();
 		for (EventOutcome outcome : events == null ? List.<EventOutcome>of() : events)
 		{
-			String event = eventNames.getOrDefault(outcome.getSlug(), outcome.getSlug());
+			String event = eventNames.getOrDefault(outcome.getNumber(), "Event " + outcome.getNumber());
 			switch (outcome.getStatus())
 			{
 				case COUNTED:

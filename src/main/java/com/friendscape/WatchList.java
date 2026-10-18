@@ -14,13 +14,13 @@ final class WatchList
 {
 	static final WatchList EMPTY = new WatchList(Map.of(), Map.of(), Set.of());
 
-	/** Event slugs by watched item id. */
-	private final Map<Integer, Set<String>> eventsById;
+	/** Event numbers by watched item id. */
+	private final Map<Integer, Set<Integer>> eventsById;
 	/** Item id by lower-case name; null where two watched ids share the name. */
 	private final Map<String, Integer> idByName;
-	private final Set<String> clogSlotEvents;
+	private final Set<Integer> clogSlotEvents;
 
-	private WatchList(Map<Integer, Set<String>> eventsById, Map<String, Integer> idByName, Set<String> clogSlotEvents)
+	private WatchList(Map<Integer, Set<Integer>> eventsById, Map<String, Integer> idByName, Set<Integer> clogSlotEvents)
 	{
 		this.eventsById = eventsById;
 		this.idByName = idByName;
@@ -31,19 +31,19 @@ final class WatchList
 	 * The watch of every Live Event still on its Roster and not left. A held entry still watches:
 	 * its Submissions are kept and count if the identity check settles in the player's favour.
 	 */
-	static WatchList of(DiscoveryResponse discovery, Set<String> left)
+	static WatchList of(DiscoveryResponse discovery, Set<Integer> left)
 	{
 		if (discovery == null)
 		{
 			return EMPTY;
 		}
-		Map<Integer, Set<String>> eventsById = new HashMap<>();
+		Map<Integer, Set<Integer>> eventsById = new HashMap<>();
 		Map<String, Integer> idByName = new HashMap<>();
-		Set<String> clogSlotEvents = new HashSet<>();
+		Set<Integer> clogSlotEvents = new HashSet<>();
 		for (DiscoveryResponse.DiscoveredEvent event : discovery.events())
 		{
 			DiscoveryResponse.Watch watch = event.getWatch();
-			if (watch == null || left.contains(event.getSlug())
+			if (watch == null || left.contains(event.getNumber())
 				|| !DiscoveryResponse.LIVE.equals(event.getPhase())
 				|| DiscoveryResponse.REMOVED.equals(event.getEntry()))
 			{
@@ -51,7 +51,7 @@ final class WatchList
 			}
 			if (watch.isClogSlots())
 			{
-				clogSlotEvents.add(event.getSlug());
+				clogSlotEvents.add(event.getNumber());
 			}
 			if (watch.getItems() == null)
 			{
@@ -59,7 +59,7 @@ final class WatchList
 			}
 			for (DiscoveryResponse.WatchedItem item : watch.getItems())
 			{
-				eventsById.computeIfAbsent(item.getId(), id -> new HashSet<>()).add(event.getSlug());
+				eventsById.computeIfAbsent(item.getId(), id -> new HashSet<>()).add(event.getNumber());
 				if (item.getName() != null)
 				{
 					String key = key(item.getName());
@@ -73,7 +73,7 @@ final class WatchList
 	}
 
 	/** The Events watching this canonical item id; empty when none does. */
-	Set<String> eventsFor(int itemId)
+	Set<Integer> eventsFor(int itemId)
 	{
 		return eventsById.getOrDefault(itemId, Set.of());
 	}
@@ -85,7 +85,7 @@ final class WatchList
 	}
 
 	/** The Events where some open Tile counts any new collection log slot. */
-	Set<String> clogSlotEvents()
+	Set<Integer> clogSlotEvents()
 	{
 		return clogSlotEvents;
 	}

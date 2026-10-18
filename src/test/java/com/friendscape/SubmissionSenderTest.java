@@ -35,7 +35,7 @@ public class SubmissionSenderTest
 	private final List<ProblemNotices.Notice> told = new CopyOnWriteArrayList<>();
 	private final AtomicInteger changes = new AtomicInteger();
 	private volatile int answerCode = 200;
-	private volatile String answer = "{\"events\":[{\"slug\":\"bingo\",\"status\":\"counted\"}]}";
+	private volatile String answer = "{\"events\":[{\"number\":123456,\"status\":\"counted\"}]}";
 	private SubmissionQueue queue;
 
 	@Before
@@ -74,13 +74,13 @@ public class SubmissionSenderTest
 	private static QueuedSubmission entry(String id, Instant capturedAt)
 	{
 		return new QueuedSubmission(id, Long.toString(HASH), "Iron Man", "item", 11286, "Draconic visage", 1,
-			capturedAt.toString(), List.of("bingo"));
+			capturedAt.toString(), List.of(123456));
 	}
 
 	/** Flushes, then waits until the send settled as {@code settled} says. */
 	private void flush(SubmissionSender sender, BooleanSupplier settled) throws InterruptedException
 	{
-		sender.flush(HASH, new SubmissionSender.Context(Set.of(), Map.of("bingo", "Bingo"), true), NOW);
+		sender.flush(HASH, new SubmissionSender.Context(Set.of(), Map.of(123456, "Bingo"), true), NOW);
 		for (int i = 0; i < 200 && !settled.getAsBoolean(); i++)
 		{
 			Thread.sleep(10);
@@ -110,7 +110,7 @@ public class SubmissionSenderTest
 
 		flush(sender, () -> !queue.due(HASH, NOW.plus(SubmissionQueue.FIRST_RETRY)).isEmpty());
 
-		assertEquals(Map.of("7", Map.of("bingo", 1)), queue.waiting());
+		assertEquals(Map.of("7", Map.of(123456, 1)), queue.waiting());
 		assertEquals("backing off", List.of(), queue.due(HASH, NOW));
 		assertEquals(1, queue.due(HASH, NOW.plus(SubmissionQueue.FIRST_RETRY)).size());
 		assertEquals(List.of(), told);
@@ -141,7 +141,7 @@ public class SubmissionSenderTest
 
 		assertEquals(List.of(new ProblemNotices.Notice(
 			"The send queue is full, so Draconic visage was taken out of it. Upload it on the event page.", true)), told);
-		assertEquals(new EventCard.Queued(SubmissionQueue.CAP, 1), sender.queued(HASH).get("bingo"));
+		assertEquals(new EventCard.Queued(SubmissionQueue.CAP, 1), sender.queued(HASH).get(123456));
 	}
 
 	@Test
@@ -149,7 +149,7 @@ public class SubmissionSenderTest
 	{
 		SubmissionSender sender = sender();
 		sender.add(List.of(entry("a", NOW)), new byte[]{1});
-		DiscoveryResponse discovery = GSON.fromJson("{\"events\":[{\"slug\":\"bingo\",\"phase\":\"ended\","
+		DiscoveryResponse discovery = GSON.fromJson("{\"events\":[{\"number\":123456,\"phase\":\"ended\","
 			+ "\"endsAt\":\"2026-11-03T11:00:00Z\",\"graceWindowSeconds\":3600}]}", DiscoveryResponse.class);
 
 		sender.prune(HASH, discovery, NOW);
@@ -163,11 +163,11 @@ public class SubmissionSenderTest
 	{
 		SubmissionSender sender = sender();
 		sender.add(List.of(entry("a", NOW)), new byte[]{1});
-		DiscoveryResponse discovery = GSON.fromJson("{\"events\":[{\"slug\":\"bingo\",\"phase\":\"live\","
+		DiscoveryResponse discovery = GSON.fromJson("{\"events\":[{\"number\":123456,\"phase\":\"live\","
 			+ "\"endsAt\":\"2026-11-04T12:00:00Z\",\"graceWindowSeconds\":3600}]}", DiscoveryResponse.class);
 
 		sender.prune(HASH, discovery, NOW);
 
-		assertEquals(new EventCard.Queued(1, 0), sender.queued(HASH).get("bingo"));
+		assertEquals(new EventCard.Queued(1, 0), sender.queued(HASH).get(123456));
 	}
 }

@@ -102,16 +102,24 @@ class SubmissionQueue
 		try
 		{
 			QueuedSubmission submission = gson.fromJson(new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8), QueuedSubmission.class);
-			if (submission != null && file.getName().equals(submission.getId() + JSON) && capturedAt(submission) != Instant.MIN)
+			if (submission != null && file.getName().equals(submission.getId() + JSON) && capturedAt(submission) != Instant.MIN
+				&& hasEventNumbers(submission))
 			{
 				return submission;
 			}
 		}
 		catch (IOException | JsonParseException e)
 		{
+			// Also an entry stored with Event slugs, before Events were numbered: load() deletes it
 			log.warn("Unreadable queued Submission {}", file.getName(), e);
 		}
 		return null;
+	}
+
+	/** Every Event it names is an Event number; false for one stored before Events were numbered. */
+	private static boolean hasEventNumbers(QueuedSubmission submission)
+	{
+		return submission.getEvents() != null && submission.getEvents().stream().allMatch(StoredEventNumbers::isEventNumber);
 	}
 
 	/**
@@ -213,7 +221,7 @@ class SubmissionQueue
 	 * discovery (card removed) or past {@code keepUntil} (its end plus Grace window; null while it
 	 * has no end). Another account's submissions wait for that account's own discovery.
 	 */
-	synchronized List<QueuedSubmission> prune(long accountHash, Map<String, Instant> keepUntil, Instant now)
+	synchronized List<QueuedSubmission> prune(long accountHash, Map<Integer, Instant> keepUntil, Instant now)
 	{
 		String hash = Long.toString(accountHash);
 		List<QueuedSubmission> pruned = new ArrayList<>();
@@ -224,10 +232,10 @@ class SubmissionQueue
 				continue;
 			}
 			boolean wanted = false;
-			for (String slug : submission.getEvents())
+			for (Integer number : submission.getEvents())
 			{
-				Instant until = keepUntil.get(slug);
-				wanted |= keepUntil.containsKey(slug) && (until == null || now.isBefore(until));
+				Instant until = keepUntil.get(number);
+				wanted |= keepUntil.containsKey(number) && (until == null || now.isBefore(until));
 			}
 			if (!wanted)
 			{
@@ -238,14 +246,14 @@ class SubmissionQueue
 		return pruned;
 	}
 
-	/** How many submissions wait per Event slug, by account hash: the cards' "waiting to send". */
-	synchronized Map<String, Map<String, Integer>> waiting()
+	/** How many submissions wait per Event number, by account hash: the cards' "waiting to send". */
+	synchronized Map<String, Map<Integer, Integer>> waiting()
 	{
-		Map<String, Map<String, Integer>> waiting = new HashMap<>();
+		Map<String, Map<Integer, Integer>> waiting = new HashMap<>();
 		for (QueuedSubmission submission : submissions.values())
 		{
-			Map<String, Integer> bySlug = waiting.computeIfAbsent(submission.getAccountHash(), hash -> new TreeMap<>());
-			submission.getEvents().forEach(slug -> bySlug.merge(slug, 1, Integer::sum));
+			Map<Integer, Integer> byEvent = waiting.computeIfAbsent(submission.getAccountHash(), hash -> new TreeMap<>());
+			submission.getEvents().forEach(number -> byEvent.merge(number, 1, Integer::sum));
 		}
 		return waiting;
 	}

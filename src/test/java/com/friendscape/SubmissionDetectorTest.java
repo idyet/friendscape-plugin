@@ -30,13 +30,13 @@ public class SubmissionDetectorTest
 
 	private void watch(String watch)
 	{
-		String json = "{\"events\":[{\"slug\":\"bingo\",\"phase\":\"live\",\"entry\":\"on_roster\",\"watch\":" + watch + "}]}";
+		String json = "{\"events\":[{\"number\":123456,\"phase\":\"live\",\"entry\":\"on_roster\",\"watch\":" + watch + "}]}";
 		detector.setWatch(WatchList.of(new Gson().fromJson(json, DiscoveryResponse.class), Set.of()));
 	}
 
 	private static SubmissionDetector.Drop item(int id, String name, int quantity)
 	{
-		return new SubmissionDetector.Drop(SubmissionDetector.Kind.ITEM, id, name, quantity, Set.of("bingo"));
+		return new SubmissionDetector.Drop(SubmissionDetector.Kind.ITEM, id, name, quantity, Set.of(123456));
 	}
 
 	@Test
@@ -105,10 +105,10 @@ public class SubmissionDetectorTest
 		watch("{\"items\":[{\"id\":11286,\"name\":\"Draconic visage\"}],\"clogSlots\":true}");
 
 		assertEquals(List.of(new SubmissionDetector.Drop(SubmissionDetector.Kind.CLOG_SLOT, null, "Dragon pickaxe", 1,
-				Set.of("bingo"))),
+				Set.of(123456))),
 			detector.chat("New item added to your collection log: Dragon pickaxe"));
 		assertEquals(List.of(new SubmissionDetector.Drop(SubmissionDetector.Kind.CLOG_SLOT, VISAGE, "Draconic visage", 1,
-				Set.of("bingo"))),
+				Set.of(123456))),
 			detector.chat("New item added to your collection log: Draconic visage"));
 	}
 

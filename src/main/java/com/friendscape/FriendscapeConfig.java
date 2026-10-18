@@ -9,9 +9,9 @@ public interface FriendscapeConfig extends Config
 {
 	String GROUP = "friendscape";
 	String SEND_DATA = "sendData";
-	/** Slugs of Events left on this install (see {@link StoredSlugs}); never sent anywhere. */
+	/** Numbers of Events left on this install (see {@link StoredEventNumbers}); never sent anywhere. */
 	String LEFT_EVENTS = "leftEvents";
-	/** Slugs of Events whose mini board the player closed (see {@link StoredSlugs}). */
+	/** Numbers of Events whose mini board the player closed (see {@link StoredEventNumbers}). */
 	String CLOSED_BOARDS = "closedBoards";
 	String WARNING = "This plugin submits your username, account hash, drops, kill counts, XP and screenshots"
 		+ " to a 3rd-party server (friendscape) not controlled or verified by the RuneLite Developers.";

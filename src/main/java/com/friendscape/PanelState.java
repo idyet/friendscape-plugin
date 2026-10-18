@@ -18,5 +18,5 @@ class PanelState
 	List<EventCard> cards;
 	/** Events whose mini board the player closed (SPEC 10.3). */
 	@Builder.Default
-	Set<String> closedBoards = Set.of();
+	Set<Integer> closedBoards = Set.of();
 }

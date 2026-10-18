@@ -197,60 +197,60 @@ public class FriendscapePlugin extends Plugin
 		panel = new FriendscapePanel(this::setSending, new FriendscapePanel.CardActions()
 		{
 			@Override
-			public void leave(String slug)
+			public void leave(int number)
 			{
-				setLeft(slug, true);
+				setLeft(number, true);
 			}
 
 			@Override
-			public void rejoin(String slug)
+			public void rejoin(int number)
 			{
-				setLeft(slug, false);
+				setLeft(number, false);
 			}
 
 			@Override
-			public void openEventPage(String slug)
+			public void openEventPage(int number)
 			{
-				LinkBrowser.browse(FriendscapeApi.eventPage(apiBase, slug));
+				LinkBrowser.browse(FriendscapeApi.eventPage(apiBase, number));
 			}
 
 			@Override
-			public void openUploadPage(String slug)
+			public void openUploadPage(int number)
 			{
-				LinkBrowser.browse(FriendscapeApi.uploadPage(apiBase, slug));
+				LinkBrowser.browse(FriendscapeApi.uploadPage(apiBase, number));
 			}
 
 			@Override
-			public void report(String slug)
+			public void report(int number)
 			{
 				String name = rsn;
 				if (name == null)
 				{
 					return;
 				}
-				api.report(name, accountHash, slug, message -> chat(message, ChatColorType.NORMAL));
+				api.report(name, accountHash, number, message -> chat(message, ChatColorType.NORMAL));
 			}
 
 			@Override
-			public void openBoard(String slug, int teamId)
+			public void openBoard(int number, int teamId)
 			{
-				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, slug, teamId));
+				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, number, teamId));
 			}
 
 			@Override
-			public void openTile(String slug, int teamId, int number)
+			public void openTile(int number, int teamId, int tile)
 			{
-				LinkBrowser.browse(FriendscapeApi.tilePage(apiBase, slug, teamId, number));
+				LinkBrowser.browse(FriendscapeApi.tilePage(apiBase, number, teamId, tile));
 			}
 
 			@Override
-			public void setBoardOpen(String slug, boolean open)
+			public void setBoardOpen(int number, boolean open)
 			{
-				Set<String> closed = new HashSet<>(StoredSlugs.parse(config.closedBoards()));
-				if (open ? closed.remove(slug) : closed.add(slug))
+				Set<Integer> closed = new HashSet<>(StoredEventNumbers.parse(config.closedBoards()));
+				if (open ? closed.remove(number) : closed.add(number))
 				{
 					configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.CLOSED_BOARDS,
-						StoredSlugs.format(closed));
+						StoredEventNumbers.format(closed));
 				}
 			}
 		}, this::loadTileIcon);
@@ -668,7 +668,7 @@ public class FriendscapePlugin extends Plugin
 			return;
 		}
 		DiscoveryResponse found = discovery;
-		Set<String> muted = found == null ? Set.of() : found.muted(left());
+		Set<Integer> muted = found == null ? Set.of() : found.muted(left());
 		int sentIn = session.get();
 		api.sendReadings(name, accountHash, xp, kcChat, moments, muted, response ->
 		{
@@ -834,15 +834,15 @@ public class FriendscapePlugin extends Plugin
 	}
 
 	/** Events left on this install (SPEC 10.3): nothing more is sent for them. */
-	private Set<String> left()
+	private Set<Integer> left()
 	{
-		return StoredSlugs.parse(config.leftEvents());
+		return StoredEventNumbers.parse(config.leftEvents());
 	}
 
-	private void setLeft(String slug, boolean leave)
+	private void setLeft(int number, boolean leave)
 	{
-		Set<String> left = new HashSet<>(left());
-		boolean changed = leave ? left.add(slug) : left.remove(slug);
+		Set<Integer> left = new HashSet<>(left());
+		boolean changed = leave ? left.add(number) : left.remove(number);
 		if (!changed)
 		{
 			return;
@@ -852,7 +852,7 @@ public class FriendscapePlugin extends Plugin
 			// Back in: the next Reading carries every skill, as at login
 			sendAllSkills = true;
 		}
-		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, StoredSlugs.format(left));
+		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, StoredEventNumbers.format(left));
 	}
 
 	/** Cancels every in-flight call; queued Submissions they carried are due again. */
@@ -947,7 +947,7 @@ public class FriendscapePlugin extends Plugin
 			.rsn(rsn)
 			.status(status())
 			.cards(cards)
-			.closedBoards(StoredSlugs.parse(config.closedBoards()))
+			.closedBoards(StoredEventNumbers.parse(config.closedBoards()))
 			.build();
 		FriendscapePanel target = panel;
 		if (target != null)

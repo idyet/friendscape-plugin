@@ -24,8 +24,11 @@ class QueuedSubmission
 	int quantity;
 	/** ISO 8601. */
 	String capturedAt;
-	/** The Events that watched it; it leaves the queue once none of them can count it. */
-	List<String> events;
+	/**
+	 * The Event numbers that watched it; it leaves the queue once none of them can count it. Entries
+	 * stored with Event slugs, before Events were numbered, are dropped on load.
+	 */
+	List<Integer> events;
 
 	boolean isClogSlot()
 	{

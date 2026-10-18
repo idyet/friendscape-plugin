@@ -80,33 +80,33 @@ class FriendscapeApi
 		}, error -> onReachable.accept(false));
 	}
 
-	/** The website's page for an Event: {@code /e/<slug>} on the API's host. */
-	static String eventPage(HttpUrl base, String slug)
+	/** The website's page for an Event: {@code /e/<number>} on the API's host. */
+	static String eventPage(HttpUrl base, int number)
 	{
-		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).build().toString();
+		return base.newBuilder().encodedPath("/e/").addPathSegment(Integer.toString(number)).build().toString();
 	}
 
 	/** The website's upload page for an Event, for needs-evidence and manual uploads. */
-	static String uploadPage(HttpUrl base, String slug)
+	static String uploadPage(HttpUrl base, int number)
 	{
-		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).addPathSegment("upload").build().toString();
+		return base.newBuilder().encodedPath("/e/").addPathSegment(Integer.toString(number)).addPathSegment("upload").build().toString();
 	}
 
-	/** A Team's board page: {@code /e/<slug>/t/<team>}. */
-	static String teamPage(HttpUrl base, String slug, int teamId)
+	/** A Team's board page: {@code /e/<number>/t/<team>}. */
+	static String teamPage(HttpUrl base, int number, int teamId)
 	{
-		return teamPageUrl(base, slug, teamId).build().toString();
+		return teamPageUrl(base, number, teamId).build().toString();
 	}
 
-	/** One Tile's detail on a Team's board page: {@code /e/<slug>/t/<team>?tile=<n>}. */
-	static String tilePage(HttpUrl base, String slug, int teamId, int number)
+	/** One Tile's detail on a Team's board page: {@code /e/<number>/t/<team>?tile=<n>}. */
+	static String tilePage(HttpUrl base, int number, int teamId, int tile)
 	{
-		return teamPageUrl(base, slug, teamId).addQueryParameter("tile", Integer.toString(number)).build().toString();
+		return teamPageUrl(base, number, teamId).addQueryParameter("tile", Integer.toString(tile)).build().toString();
 	}
 
-	private static HttpUrl.Builder teamPageUrl(HttpUrl base, String slug, int teamId)
+	private static HttpUrl.Builder teamPageUrl(HttpUrl base, int number, int teamId)
 	{
-		return base.newBuilder().encodedPath("/e/").addPathSegment(slug).addPathSegment("t")
+		return base.newBuilder().encodedPath("/e/").addPathSegment(Integer.toString(number)).addPathSegment("t")
 			.addPathSegment(Integer.toString(teamId)).query(null);
 	}
 
@@ -124,11 +124,11 @@ class FriendscapeApi
 	 * maps names to activities), either of which may be empty. Marked as the start or end Reading
 	 * for {@code moments}.
 	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
-	 * a total that covers it. {@code muted} names the Events left on this install. The server's
+	 * a total that covers it. {@code muted} holds the numbers of the Events left on this install. The server's
 	 * answer comes back on an OkHttp thread; nothing comes back for a failed or refused send.
 	 */
 	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Map<String, Long> kcChat,
-		Set<Moment> moments, Set<String> muted, Consumer<ReadingsResponse> onResult)
+		Set<Moment> moments, Set<Integer> muted, Consumer<ReadingsResponse> onResult)
 	{
 		Map<String, Object> body = identity(rsn, accountHash);
 		if (!xp.isEmpty())
@@ -180,13 +180,13 @@ class FriendscapeApi
 
 	/**
 	 * "Report to Friendscape" on a held card (SPEC 10.3): asks the admin to look at the identity
-	 * mismatch over {@code rsn}, from the card of {@code slug}. {@code onMessage} hears what to tell
+	 * mismatch over {@code rsn}, from the card of Event {@code number}. {@code onMessage} hears what to tell
 	 * the player, on an OkHttp thread; nothing for a call refused here or cancelled.
 	 */
-	void report(String rsn, long accountHash, String slug, Consumer<String> onMessage)
+	void report(String rsn, long accountHash, int number, Consumer<String> onMessage)
 	{
 		Map<String, Object> body = identity(rsn, accountHash);
-		body.put("slug", slug);
+		body.put("number", number);
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/report"))
 			.post(RequestBody.create(JSON, gson.toJson(body)))
@@ -223,10 +223,10 @@ class FriendscapeApi
 
 	/**
 	 * Sends an item, clog or pet Submission (SPEC 5.4) as multipart: the queued Submission's fields and
-	 * the screenshot, which is left out when capture failed. {@code muted} names the Events left on
-	 * this install. False when refused here, as sending is off: the callback never fires.
+	 * the screenshot, which is left out when capture failed. {@code muted} holds the numbers of the Events
+	 * left on this install. False when refused here, as sending is off: the callback never fires.
 	 */
-	boolean sendSubmission(QueuedSubmission submission, byte[] png, Set<String> muted, SubmissionCallback callback)
+	boolean sendSubmission(QueuedSubmission submission, byte[] png, Set<Integer> muted, SubmissionCallback callback)
 	{
 		MultipartBody.Builder body = new MultipartBody.Builder()
 			.setType(MultipartBody.FORM)

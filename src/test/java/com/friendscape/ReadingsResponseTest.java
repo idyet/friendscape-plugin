@@ -22,9 +22,9 @@ public class ReadingsResponseTest
 	public void readsEachEventStatus()
 	{
 		ReadingsResponse response = parse("{\"rsn\":\"Iron Man\",\"events\":["
-			+ "{\"slug\":\"sotw\",\"status\":\"counted\",\"startsAt\":\"2026-11-01T00:00:00.000Z\",\"endsAt\":null}]}");
+			+ "{\"number\":123456,\"status\":\"counted\",\"startsAt\":\"2026-11-01T00:00:00.000Z\",\"endsAt\":null}]}");
 
-		assertEquals("sotw", response.getEvents().get(0).getSlug());
+		assertEquals(123456, response.getEvents().get(0).getNumber());
 		assertEquals("counted", response.getEvents().get(0).getStatus());
 	}
 
@@ -32,9 +32,9 @@ public class ReadingsResponseTest
 	public void schedulesTheStartReadingAtTheEarliestStartToCome()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"b\",\"status\":\"not_started\",\"startsAt\":\"2026-11-02T18:00:00.000Z\"},"
-			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
-			+ "{\"slug\":\"c\",\"status\":\"counted\",\"startsAt\":\"2026-10-01T18:00:00.000Z\"}]}");
+			+ "{\"number\":222222,\"status\":\"not_started\",\"startsAt\":\"2026-11-02T18:00:00.000Z\"},"
+			+ "{\"number\":111111,\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"number\":333333,\"status\":\"counted\",\"startsAt\":\"2026-10-01T18:00:00.000Z\"}]}");
 
 		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextMomentReading(NOW));
 	}
@@ -42,7 +42,7 @@ public class ReadingsResponseTest
 	@Test
 	public void schedulesNoStartReadingForAnEventWithoutAStart()
 	{
-		ReadingsResponse response = parse("{\"events\":[{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":null}]}");
+		ReadingsResponse response = parse("{\"events\":[{\"number\":111111,\"status\":\"not_started\",\"startsAt\":null}]}");
 
 		assertNull(response.nextMomentReading(NOW));
 	}
@@ -51,7 +51,7 @@ public class ReadingsResponseTest
 	public void retriesShortlyWhenTheServerHasNotReachedAStartThisClockHasPassed()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T16:59:59.000Z\"}]}");
+			+ "{\"number\":111111,\"status\":\"not_started\",\"startsAt\":\"2026-11-01T16:59:59.000Z\"}]}");
 
 		assertEquals(NOW.plusSeconds(10), response.nextMomentReading(NOW));
 	}
@@ -60,9 +60,9 @@ public class ReadingsResponseTest
 	public void schedulesTheEndReadingAtTheEndOfACountedEvent()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"a\",\"status\":\"counted\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"},"
-			+ "{\"slug\":\"b\",\"status\":\"held\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T17:30:00.000Z\"},"
-			+ "{\"slug\":\"c\",\"status\":\"ended\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T16:00:00.000Z\"}]}");
+			+ "{\"number\":111111,\"status\":\"counted\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"number\":222222,\"status\":\"held\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T17:30:00.000Z\"},"
+			+ "{\"number\":333333,\"status\":\"ended\",\"startsAt\":\"2026-10-01T18:00:00.000Z\",\"endsAt\":\"2026-11-01T16:00:00.000Z\"}]}");
 
 		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextMomentReading(NOW));
 	}
@@ -71,8 +71,8 @@ public class ReadingsResponseTest
 	public void schedulesWhicheverMomentComesFirst()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T19:00:00.000Z\"},"
-			+ "{\"slug\":\"b\",\"status\":\"counted\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"}]}");
+			+ "{\"number\":111111,\"status\":\"not_started\",\"startsAt\":\"2026-11-01T19:00:00.000Z\"},"
+			+ "{\"number\":222222,\"status\":\"counted\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"}]}");
 
 		assertEquals(Instant.parse("2026-11-01T18:00:02Z"), response.nextMomentReading(NOW));
 	}
@@ -81,7 +81,7 @@ public class ReadingsResponseTest
 	public void retriesShortlyWhenTheServerHasNotReachedAnEndThisClockHasPassed()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"a\",\"status\":\"counted\",\"endsAt\":\"2026-11-01T16:59:59.000Z\"}]}");
+			+ "{\"number\":111111,\"status\":\"counted\",\"endsAt\":\"2026-11-01T16:59:59.000Z\"}]}");
 
 		assertEquals(NOW.plusSeconds(10), response.nextMomentReading(NOW));
 	}
@@ -90,8 +90,8 @@ public class ReadingsResponseTest
 	public void marksTheMomentsThisClockHasPassed()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T17:00:00.000Z\"},"
-			+ "{\"slug\":\"b\",\"status\":\"counted\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"}]}");
+			+ "{\"number\":111111,\"status\":\"not_started\",\"startsAt\":\"2026-11-01T17:00:00.000Z\"},"
+			+ "{\"number\":222222,\"status\":\"counted\",\"endsAt\":\"2026-11-01T18:00:00.000Z\"}]}");
 
 		assertEquals(EnumSet.of(Moment.START), response.momentsDue(NOW));
 		assertEquals(EnumSet.of(Moment.START, Moment.END), response.momentsDue(Instant.parse("2026-11-01T18:00:02Z")));
@@ -101,8 +101,8 @@ public class ReadingsResponseTest
 	public void marksNothingBeforeAnyMoment()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"a\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
-			+ "{\"slug\":\"b\",\"status\":\"ended\",\"endsAt\":\"2026-11-01T16:00:00.000Z\"}]}");
+			+ "{\"number\":111111,\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"number\":222222,\"status\":\"ended\",\"endsAt\":\"2026-11-01T16:00:00.000Z\"}]}");
 
 		assertEquals(Set.of(), response.momentsDue(NOW));
 		assertEquals(Set.of(), parse("{}").momentsDue(NOW));
@@ -119,10 +119,10 @@ public class ReadingsResponseTest
 	public void schedulesNothingForAnEventLeftOnThisInstall()
 	{
 		ReadingsResponse response = parse("{\"events\":["
-			+ "{\"slug\":\"left\",\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
-			+ "{\"slug\":\"kept\",\"status\":\"not_started\",\"startsAt\":\"2026-11-02T18:00:00.000Z\"}]}");
+			+ "{\"number\":100001,\"status\":\"not_started\",\"startsAt\":\"2026-11-01T18:00:00.000Z\"},"
+			+ "{\"number\":100002,\"status\":\"not_started\",\"startsAt\":\"2026-11-02T18:00:00.000Z\"}]}");
 
-		assertEquals(Instant.parse("2026-11-02T18:00:02Z"), response.without(Set.of("left")).nextMomentReading(NOW));
-		assertEquals(java.util.Map.of("left", "not_started", "kept", "not_started"), response.statuses());
+		assertEquals(Instant.parse("2026-11-02T18:00:02Z"), response.without(Set.of(100001)).nextMomentReading(NOW));
+		assertEquals(java.util.Map.of(100001, "not_started", 100002, "not_started"), response.statuses());
 	}
 }

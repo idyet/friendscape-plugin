@@ -32,19 +32,19 @@ class SubmissionSender
 	static class Context
 	{
 		/** The discovered Events left on this install. */
-		Set<String> muted;
-		/** Event names by slug, for the chat lines. */
-		Map<String, String> eventNames;
+		Set<Integer> muted;
+		/** Event names by Event number, for the chat lines. */
+		Map<Integer, String> eventNames;
 		boolean chatOnCounted;
 	}
 
 	private final SubmissionQueue queue;
 	private final FriendscapeApi api;
 	private final Listener listener;
-	/** Pushed out of the full queue this session, by account hash and then Event slug. */
-	private final Map<String, Map<String, Integer>> pushedOut = new ConcurrentHashMap<>();
-	/** The queue's counts as of its last change, by account hash and then Event slug. */
-	private volatile Map<String, Map<String, Integer>> waiting;
+	/** Pushed out of the full queue this session, by account hash and then Event number. */
+	private final Map<String, Map<Integer, Integer>> pushedOut = new ConcurrentHashMap<>();
+	/** The queue's counts as of its last change, by account hash and then Event number. */
+	private volatile Map<String, Map<Integer, Integer>> waiting;
 
 	SubmissionSender(SubmissionQueue queue, FriendscapeApi api, Listener listener)
 	{
@@ -64,8 +64,8 @@ class SubmissionSender
 		{
 			for (QueuedSubmission removed : queue.add(submission, png))
 			{
-				Map<String, Integer> bySlug = pushedOut.computeIfAbsent(removed.getAccountHash(), hash -> new ConcurrentHashMap<>());
-				removed.getEvents().forEach(slug -> bySlug.merge(slug, 1, Integer::sum));
+				Map<Integer, Integer> byEvent = pushedOut.computeIfAbsent(removed.getAccountHash(), hash -> new ConcurrentHashMap<>());
+				removed.getEvents().forEach(number -> byEvent.merge(number, 1, Integer::sum));
 				listener.tell(new ProblemNotices.Notice("The send queue is full, so " + removed.getName()
 					+ " was taken out of it. Upload it on the event page.", true));
 			}
@@ -141,15 +141,15 @@ class SubmissionSender
 		queue.clearInFlight();
 	}
 
-	/** This account's queued and pushed-out Submissions by Event slug, for the cards. */
-	Map<String, EventCard.Queued> queued(long accountHash)
+	/** This account's queued and pushed-out Submissions by Event number, for the cards. */
+	Map<Integer, EventCard.Queued> queued(long accountHash)
 	{
 		String hash = Long.toString(accountHash);
-		Map<String, Integer> waitingHere = waiting.getOrDefault(hash, Map.of());
-		Map<String, Integer> pushedOutHere = pushedOut.getOrDefault(hash, Map.of());
-		Map<String, EventCard.Queued> queued = new HashMap<>();
-		waitingHere.forEach((slug, count) -> queued.put(slug, new EventCard.Queued(count, pushedOutHere.getOrDefault(slug, 0))));
-		pushedOutHere.forEach((slug, count) -> queued.putIfAbsent(slug, new EventCard.Queued(0, count)));
+		Map<Integer, Integer> waitingHere = waiting.getOrDefault(hash, Map.of());
+		Map<Integer, Integer> pushedOutHere = pushedOut.getOrDefault(hash, Map.of());
+		Map<Integer, EventCard.Queued> queued = new HashMap<>();
+		waitingHere.forEach((number, count) -> queued.put(number, new EventCard.Queued(count, pushedOutHere.getOrDefault(number, 0))));
+		pushedOutHere.forEach((number, count) -> queued.putIfAbsent(number, new EventCard.Queued(0, count)));
 		return queued;
 	}
 

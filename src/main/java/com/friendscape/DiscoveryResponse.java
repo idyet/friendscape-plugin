@@ -45,7 +45,8 @@ class DiscoveryResponse
 	@Value
 	static class DiscoveredEvent
 	{
-		String slug;
+		/** The Event number: six digits, 100000 to 999999. */
+		int number;
 		String name;
 		/** {@code bingo}, {@code sotw} or {@code botw}. */
 		String format;
@@ -241,13 +242,13 @@ class DiscoveryResponse
 		return events == null ? List.of() : events;
 	}
 
-	/** Event names by slug, for chat lines. */
-	Map<String, String> eventNames()
+	/** Event names by Event number, for chat lines. */
+	Map<Integer, String> eventNames()
 	{
-		Map<String, String> names = new HashMap<>();
+		Map<Integer, String> names = new HashMap<>();
 		for (DiscoveredEvent event : events())
 		{
-			names.put(event.getSlug(), event.getName());
+			names.put(event.getNumber(), event.getName());
 		}
 		return names;
 	}
@@ -256,13 +257,13 @@ class DiscoveryResponse
 	 * Until when each Event may still count a queued Submission: its end plus Grace window, or
 	 * null while it has no end. An Event missing here no longer has a card.
 	 */
-	Map<String, Instant> keepUntil()
+	Map<Integer, Instant> keepUntil()
 	{
-		Map<String, Instant> keepUntil = new HashMap<>();
+		Map<Integer, Instant> keepUntil = new HashMap<>();
 		for (DiscoveredEvent event : events())
 		{
 			Instant endsAt = parse(event, event.getEndsAt());
-			keepUntil.put(event.getSlug(), endsAt == null ? null : endsAt.plusSeconds(event.getGraceWindowSeconds()));
+			keepUntil.put(event.getNumber(), endsAt == null ? null : endsAt.plusSeconds(event.getGraceWindowSeconds()));
 		}
 		return keepUntil;
 	}
@@ -270,9 +271,9 @@ class DiscoveryResponse
 	/**
 	 * One card per Event, less Finalized ones past their week: live first, then scheduled, ended,
 	 * Finalized, and last those left or off the Roster, in the server's order within each.
-	 * {@code queued} holds this install's Submissions by Event slug.
+	 * {@code queued} holds this install's Submissions by Event number.
 	 */
-	List<EventCard> cards(Set<String> left, Map<String, EventCard.Queued> queued, Instant now, ZoneId zone)
+	List<EventCard> cards(Set<Integer> left, Map<Integer, EventCard.Queued> queued, Instant now, ZoneId zone)
 	{
 		List<DiscoveredEvent> ordered = new ArrayList<>(events());
 		ordered.sort(Comparator.comparingInt(event -> cardOrder(event, left)));
@@ -284,15 +285,15 @@ class DiscoveryResponse
 			{
 				continue;
 			}
-			cards.add(EventCard.of(event, left.contains(event.getSlug()),
-				queued.getOrDefault(event.getSlug(), EventCard.Queued.NONE), zone));
+			cards.add(EventCard.of(event, left.contains(event.getNumber()),
+				queued.getOrDefault(event.getNumber(), EventCard.Queued.NONE), zone));
 		}
 		return cards;
 	}
 
-	private static int cardOrder(DiscoveredEvent event, Set<String> left)
+	private static int cardOrder(DiscoveredEvent event, Set<Integer> left)
 	{
-		if (left.contains(event.getSlug()) || REMOVED.equals(event.getEntry()))
+		if (left.contains(event.getNumber()) || REMOVED.equals(event.getEntry()))
 		{
 			return 4;
 		}
@@ -313,11 +314,11 @@ class DiscoveryResponse
 	 * (an Event that just ended still takes its end Reading). A held entry wants them too: its
 	 * Readings settle the identity check.
 	 */
-	boolean wantsReadings(Set<String> left, Instant now)
+	boolean wantsReadings(Set<Integer> left, Instant now)
 	{
 		for (DiscoveredEvent event : events())
 		{
-			if (left.contains(event.getSlug()) || REMOVED.equals(event.getEntry())
+			if (left.contains(event.getNumber()) || REMOVED.equals(event.getEntry())
 				|| FINALIZED.equals(event.getPhase()))
 			{
 				continue;
@@ -336,14 +337,14 @@ class DiscoveryResponse
 	}
 
 	/** The discovered Events the player left: what a Reading names as muted. Sorted, for the wire. */
-	Set<String> muted(Set<String> left)
+	Set<Integer> muted(Set<Integer> left)
 	{
-		Set<String> muted = new TreeSet<>();
+		Set<Integer> muted = new TreeSet<>();
 		for (DiscoveredEvent event : events())
 		{
-			if (left.contains(event.getSlug()))
+			if (left.contains(event.getNumber()))
 			{
-				muted.add(event.getSlug());
+				muted.add(event.getNumber());
 			}
 		}
 		return muted;
@@ -354,14 +355,14 @@ class DiscoveryResponse
 	 * and end Readings, so an idle player still sends the start Reading of an Event Scheduled after
 	 * login. Mirrors core {@code readingStatus}.
 	 */
-	ReadingsResponse asReadings(Set<String> left)
+	ReadingsResponse asReadings(Set<Integer> left)
 	{
 		List<ReadingsResponse.EventReading> readings = new ArrayList<>();
 		for (DiscoveredEvent event : events())
 		{
-			if (!left.contains(event.getSlug()))
+			if (!left.contains(event.getNumber()))
 			{
-				readings.add(new ReadingsResponse.EventReading(event.getSlug(), readingStatus(event),
+				readings.add(new ReadingsResponse.EventReading(event.getNumber(), readingStatus(event),
 					event.getStartsAt(), event.getEndsAt()));
 			}
 		}
@@ -398,7 +399,7 @@ class DiscoveryResponse
 		}
 		catch (DateTimeParseException e)
 		{
-			log.warn("Ignoring Event {} with an unreadable time {}", event.getSlug(), at);
+			log.warn("Ignoring Event {} with an unreadable time {}", event.getNumber(), at);
 			return null;
 		}
 	}

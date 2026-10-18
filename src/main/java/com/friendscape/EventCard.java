@@ -18,7 +18,8 @@ class EventCard
 	static final String OPEN_BOARD = "Open board";
 	static final String OPEN_EVENT_PAGE = "Open event page";
 
-	String slug;
+	/** The Event number. */
+	int number;
 	String name;
 	CardState state;
 	/** The line under the name: what the state means for the player. */
@@ -78,7 +79,7 @@ class EventCard
 		boolean report = state == CardState.ATTENTION && DiscoveryResponse.HELD.equals(event.getEntry());
 		boolean live = DiscoveryResponse.LIVE.equals(event.getPhase()) && !left
 			&& !DiscoveryResponse.REMOVED.equals(event.getEntry());
-		return new EventCard(event.getSlug(), event.getName(), state, detail(event, state, zone), standing,
+		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
 			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live);
 	}
 

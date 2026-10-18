@@ -24,6 +24,12 @@ public class SubmissionQueueTest
 	private static final Instant NOW = Instant.parse("2026-11-03T12:00:00Z");
 	private static final long HASH = 7L;
 	private static final byte[] PNG = {(byte) 0x89, 'P', 'N', 'G'};
+	private static final int BINGO = 123456;
+	private static final int OTHER = 234567;
+	private static final int LIVE = 345678;
+	private static final int OVER = 456789;
+	private static final int DELETED = 567890;
+	private static final int NO_END = 678901;
 
 	@Rule
 	public TemporaryFolder folder = new TemporaryFolder();
@@ -43,7 +49,7 @@ public class SubmissionQueueTest
 		return SubmissionQueue.open(dir, new Gson());
 	}
 
-	private static QueuedSubmission entry(String id, Instant capturedAt, String... events)
+	private static QueuedSubmission entry(String id, Instant capturedAt, Integer... events)
 	{
 		return new QueuedSubmission(id, Long.toString(HASH), "Iron Man", "item", 11286, "Draconic visage", 1,
 			capturedAt.toString(), List.of(events));
@@ -52,18 +58,18 @@ public class SubmissionQueueTest
 	@Test
 	public void keepsAnEntryAndItsScreenshotAcrossRestarts() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO), PNG);
 
 		SubmissionQueue reopened = open();
 
-		assertEquals(List.of(entry("a", NOW, "bingo")), reopened.due(HASH, NOW));
+		assertEquals(List.of(entry("a", NOW, BINGO)), reopened.due(HASH, NOW));
 		assertArrayEquals(PNG, reopened.screenshot("a"));
 	}
 
 	@Test
 	public void keepsAnEntryWhoseScreenshotFailed() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), null);
+		queue.add(entry("a", NOW, BINGO), null);
 
 		assertEquals(1, open().due(HASH, NOW).size());
 		assertNull(queue.screenshot("a"));
@@ -74,12 +80,12 @@ public class SubmissionQueueTest
 	{
 		for (int i = 0; i < SubmissionQueue.CAP; i++)
 		{
-			assertEquals(List.of(), queue.add(entry("e" + i, NOW.plusSeconds(i), "bingo"), PNG));
+			assertEquals(List.of(), queue.add(entry("e" + i, NOW.plusSeconds(i), BINGO), PNG));
 		}
 
-		List<QueuedSubmission> dropped = queue.add(entry("new", NOW.plusSeconds(100), "bingo"), PNG);
+		List<QueuedSubmission> dropped = queue.add(entry("new", NOW.plusSeconds(100), BINGO), PNG);
 
-		assertEquals(List.of(entry("e0", NOW, "bingo")), dropped);
+		assertEquals(List.of(entry("e0", NOW, BINGO)), dropped);
 		assertEquals(SubmissionQueue.CAP, open().due(HASH, NOW.plusSeconds(100)).size());
 		assertFalse(new File(dir, "e0.png").exists());
 	}
@@ -87,7 +93,7 @@ public class SubmissionQueueTest
 	@Test
 	public void sendsOnlyTheLoggedInAccountsEntries() throws IOException
 	{
-		queue.add(new QueuedSubmission("other", "8", "Alt", "item", 1, "x", 1, NOW.toString(), List.of("bingo")), PNG);
+		queue.add(new QueuedSubmission("other", "8", "Alt", "item", 1, "x", 1, NOW.toString(), List.of(BINGO)), PNG);
 
 		assertEquals(List.of(), queue.due(HASH, NOW));
 	}
@@ -95,7 +101,7 @@ public class SubmissionQueueTest
 	@Test
 	public void backsOffAfterEachFailedSend() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO), PNG);
 
 		assertEquals(1, queue.takeDue(HASH, NOW).size());
 		assertEquals("in flight, so a second flush takes nothing", List.of(), queue.takeDue(HASH, NOW));
@@ -112,7 +118,7 @@ public class SubmissionQueueTest
 	@Test
 	public void sendsAgainACallCutOffBeforeItAnswered() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO), PNG);
 		queue.takeDue(HASH, NOW);
 
 		queue.clearInFlight();
@@ -123,7 +129,7 @@ public class SubmissionQueueTest
 	@Test
 	public void releasesASendThatNeverLeftWithoutBackoff() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO), PNG);
 		queue.takeDue(HASH, NOW);
 
 		queue.release("a");
@@ -134,7 +140,7 @@ public class SubmissionQueueTest
 	@Test
 	public void removesAnAnsweredEntryAndItsScreenshot() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO), PNG);
 
 		queue.remove("a");
 
@@ -145,16 +151,16 @@ public class SubmissionQueueTest
 	@Test
 	public void prunesEntriesWhoseEventsAreGoneOrPastTheirGraceWindow() throws IOException
 	{
-		queue.add(entry("open", NOW, "live", "over"), PNG);
-		queue.add(entry("over", NOW, "over"), PNG);
-		queue.add(entry("gone", NOW, "deleted"), PNG);
-		queue.add(entry("unscheduled", NOW, "no-end"), PNG);
-		queue.add(new QueuedSubmission("alt", "8", "Alt", "item", 1, "x", 1, NOW.toString(), List.of("deleted")), PNG);
+		queue.add(entry("open", NOW, LIVE, OVER), PNG);
+		queue.add(entry("over", NOW, OVER), PNG);
+		queue.add(entry("gone", NOW, DELETED), PNG);
+		queue.add(entry("unscheduled", NOW, NO_END), PNG);
+		queue.add(new QueuedSubmission("alt", "8", "Alt", "item", 1, "x", 1, NOW.toString(), List.of(DELETED)), PNG);
 
-		Map<String, Instant> keepUntil = new java.util.HashMap<>();
-		keepUntil.put("live", NOW.plus(Duration.ofDays(1)));
-		keepUntil.put("over", NOW.minusSeconds(1));
-		keepUntil.put("no-end", null);
+		Map<Integer, Instant> keepUntil = new java.util.HashMap<>();
+		keepUntil.put(LIVE, NOW.plus(Duration.ofDays(1)));
+		keepUntil.put(OVER, NOW.minusSeconds(1));
+		keepUntil.put(NO_END, null);
 		List<QueuedSubmission> pruned = queue.prune(HASH, keepUntil, NOW);
 
 		assertEquals(Set.of("over", "gone"), Set.of(pruned.get(0).getId(), pruned.get(1).getId()));
@@ -165,18 +171,37 @@ public class SubmissionQueueTest
 	@Test
 	public void countsWhatIsWaitingPerEvent() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo", "other"), PNG);
-		queue.add(entry("b", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO, OTHER), PNG);
+		queue.add(entry("b", NOW, BINGO), PNG);
 
-		queue.add(new QueuedSubmission("alt", "8", "Alt", "item", 1, "x", 1, NOW.toString(), List.of("bingo")), PNG);
+		queue.add(new QueuedSubmission("alt", "8", "Alt", "item", 1, "x", 1, NOW.toString(), List.of(BINGO)), PNG);
 
-		assertEquals(Map.of("7", Map.of("bingo", 2, "other", 1), "8", Map.of("bingo", 1)), queue.waiting());
+		assertEquals(Map.of("7", Map.of(BINGO, 2, OTHER, 1), "8", Map.of(BINGO, 1)), queue.waiting());
+	}
+
+	@Test
+	public void dropsEntriesStoredWithEventSlugsAtStart() throws IOException
+	{
+		queue.add(entry("a", NOW, BINGO), PNG);
+		// Stored before Events were numbered: its Events are slugs, or text that is no Event number
+		Files.write(new File(dir, "slugs.json").toPath(), ("{\"id\":\"slugs\",\"accountHash\":\"7\",\"rsn\":\"Iron Man\","
+			+ "\"kind\":\"item\",\"name\":\"x\",\"quantity\":1,\"capturedAt\":\"" + NOW + "\","
+			+ "\"events\":[\"my-bingo-ab12\"]}").getBytes());
+		Files.write(new File(dir, "slugs.png").toPath(), PNG);
+		Files.write(new File(dir, "short.json").toPath(), ("{\"id\":\"short\",\"accountHash\":\"7\",\"rsn\":\"Iron Man\","
+			+ "\"kind\":\"item\",\"name\":\"x\",\"quantity\":1,\"capturedAt\":\"" + NOW + "\","
+			+ "\"events\":[42]}").getBytes());
+
+		SubmissionQueue reopened = open();
+
+		assertEquals(List.of(entry("a", NOW, BINGO)), reopened.due(HASH, NOW));
+		assertEquals(Set.of("a.json", "a.png"), Set.of(dir.list()));
 	}
 
 	@Test
 	public void removesOrphanedFilesAtStart() throws IOException
 	{
-		queue.add(entry("a", NOW, "bingo"), PNG);
+		queue.add(entry("a", NOW, BINGO), PNG);
 		Files.write(new File(dir, "orphan.png").toPath(), PNG);
 		Files.write(new File(dir, "half.json.tmp").toPath(), new byte[]{'{'});
 		Files.write(new File(dir, "broken.json").toPath(), "not json".getBytes());

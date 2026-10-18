@@ -18,7 +18,7 @@ public class EventCardTest
 	/** One discovered Event: a Live Skill of the week unless {@code extra} overrides its fields. */
 	private static DiscoveryResponse.DiscoveredEvent event(String extra)
 	{
-		String json = "{\"slug\":\"sotw\",\"name\":\"Slayer week\",\"format\":\"sotw\",\"phase\":\"live\","
+		String json = "{\"number\":123456,\"name\":\"Slayer week\",\"format\":\"sotw\",\"phase\":\"live\","
 			+ "\"startsAt\":\"2026-11-01T18:00:00.000Z\",\"endsAt\":\"2026-11-08T18:00:00.000Z\","
 			+ "\"graceWindowSeconds\":3600,\"finalizedAt\":null,\"entry\":\"on_roster\","
 			+ "\"teams\":[{\"name\":\"Team Bandos\",\"size\":3}],"
@@ -37,6 +37,7 @@ public class EventCardTest
 	{
 		EventCard card = card("");
 
+		assertEquals(123456, card.getNumber());
 		assertEquals(CardState.TRACKING, card.getState());
 		assertEquals("Tracking", card.getDetail());
 		assertEquals(List.of("Team Bandos: 2nd of 4, +12,340 xp", "+3,400 xp since start"), card.getStanding());
@@ -164,7 +165,7 @@ public class EventCardTest
 	@Test
 	public void survivesFieldsMissingFromAnOlderServer()
 	{
-		EventCard card = EventCard.of(GSON.fromJson("{\"slug\":\"x\",\"name\":\"X\",\"phase\":\"live\"}",
+		EventCard card = EventCard.of(GSON.fromJson("{\"number\":654321,\"name\":\"X\",\"phase\":\"live\"}",
 			DiscoveryResponse.DiscoveredEvent.class), false, EventCard.Queued.NONE, ZoneOffset.UTC);
 
 		assertEquals(CardState.TRACKING, card.getState());

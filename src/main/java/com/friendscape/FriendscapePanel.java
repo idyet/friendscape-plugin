@@ -33,26 +33,26 @@ class FriendscapePanel extends PluginPanel
 	/** What a card's buttons ask of the plugin. Called on the Swing thread. */
 	interface CardActions
 	{
-		void leave(String slug);
+		void leave(int number);
 
-		void rejoin(String slug);
+		void rejoin(int number);
 
-		void openEventPage(String slug);
+		void openEventPage(int number);
 
 		/** The website's upload page, for screenshots the server still needs. */
-		void openUploadPage(String slug);
+		void openUploadPage(int number);
 
 		/** "Report to Friendscape": asks the admin to look at the card's held identity mismatch. */
-		void report(String slug);
+		void report(int number);
 
 		/** A Team's board page, for a board too large for the card. */
-		void openBoard(String slug, int teamId);
+		void openBoard(int number, int teamId);
 
 		/** One Tile's detail on a Team's board page. */
-		void openTile(String slug, int teamId, int number);
+		void openTile(int number, int teamId, int tile);
 
 		/** Remembers whether a card's mini board is open, per Event. */
-		void setBoardOpen(String slug, boolean open);
+		void setBoardOpen(int number, boolean open);
 	}
 
 	static final String LEAVE_CONFIRM = "Stop sending for %s from this install?\n\n"
@@ -73,8 +73,8 @@ class FriendscapePanel extends PluginPanel
 	private final JPanel cards = new JPanel();
 	private final CardActions actions;
 	private final MiniBoardView.TileIcons icons;
-	/** The Team each mini board shows, by Event slug; kept across updates, not across restarts. */
-	private final Map<String, Integer> shownTeams = new HashMap<>();
+	/** The Team each mini board shows, by Event number; kept across updates, not across restarts. */
+	private final Map<Integer, Integer> shownTeams = new HashMap<>();
 	/** Runs each time the panel is opened. */
 	private Runnable onOpen = () -> { };
 
@@ -155,7 +155,7 @@ class FriendscapePanel extends PluginPanel
 		cardViews.clear();
 		for (EventCard card : shown)
 		{
-			CardView view = new CardView(card, !state.getClosedBoards().contains(card.getSlug()));
+			CardView view = new CardView(card, !state.getClosedBoards().contains(card.getNumber()));
 			cardViews.add(view);
 			cards.add(view);
 		}
@@ -261,26 +261,26 @@ class FriendscapePanel extends PluginPanel
 			{
 				if (confirmLeave.test(card.getName()))
 				{
-					actions.leave(card.getSlug());
+					actions.leave(card.getNumber());
 				}
 			});
 			rejoinButton.setVisible(card.isLeft());
-			rejoinButton.addActionListener(e -> actions.rejoin(card.getSlug()));
+			rejoinButton.addActionListener(e -> actions.rejoin(card.getNumber()));
 			openButton.setText(card.getLink());
 			openButton.addActionListener(e ->
 			{
 				if (card.getBoard() != null && card.miniBoard() == null)
 				{
-					actions.openBoard(card.getSlug(), defaultTeam(card.getBoard()));
+					actions.openBoard(card.getNumber(), defaultTeam(card.getBoard()));
 				}
 				else
 				{
-					actions.openEventPage(card.getSlug());
+					actions.openEventPage(card.getNumber());
 				}
 			});
 			uploadButton.setVisible(card.isUpload());
 			uploadButton.setAlignmentX(LEFT_ALIGNMENT);
-			uploadButton.addActionListener(e -> actions.openUploadPage(card.getSlug()));
+			uploadButton.addActionListener(e -> actions.openUploadPage(card.getNumber()));
 			reportButton.setVisible(card.isReport());
 			reportButton.setAlignmentX(LEFT_ALIGNMENT);
 			reportButton.setToolTipText("Tell Friendscape this RSN is yours; the answer comes in chat");
@@ -288,7 +288,7 @@ class FriendscapePanel extends PluginPanel
 			{
 				// Once per card: a repeat within a day posts nothing anyway
 				reportButton.setEnabled(false);
-				actions.report(card.getSlug());
+				actions.report(card.getNumber());
 			});
 
 			board = card.miniBoard() == null ? null : miniBoard(card);
@@ -300,7 +300,7 @@ class FriendscapePanel extends PluginPanel
 			{
 				boolean open = !board.isVisible();
 				showBoard(open);
-				actions.setBoardOpen(card.getSlug(), open);
+				actions.setBoardOpen(card.getNumber(), open);
 			});
 
 			JPanel links = new JPanel(new BorderLayout(5, 0));
@@ -325,21 +325,21 @@ class FriendscapePanel extends PluginPanel
 
 		private MiniBoardView miniBoard(EventCard card)
 		{
-			String slug = card.getSlug();
-			Integer remembered = shownTeams.get(slug);
+			int number = card.getNumber();
+			Integer remembered = shownTeams.get(number);
 			int teamId = remembered != null ? remembered : defaultTeam(card.miniBoard());
 			return new MiniBoardView(card.miniBoard(), teamId, icons, new MiniBoardView.Listener()
 			{
 				@Override
 				public void teamChosen(int chosen)
 				{
-					shownTeams.put(slug, chosen);
+					shownTeams.put(number, chosen);
 				}
 
 				@Override
-				public void openTile(int shownTeam, int number)
+				public void openTile(int shownTeam, int tile)
 				{
-					actions.openTile(slug, shownTeam, number);
+					actions.openTile(number, shownTeam, tile);
 				}
 			});
 		}

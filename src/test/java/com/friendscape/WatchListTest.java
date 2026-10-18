@@ -11,13 +11,13 @@ public class WatchListTest
 	private static final Gson GSON = new Gson();
 
 	/** A Live bingo watching {@code watch}, unless {@code extra} overrides its fields. */
-	private static String event(String slug, String watch, String extra)
+	private static String event(int number, String watch, String extra)
 	{
-		return "{\"slug\":\"" + slug + "\",\"name\":\"Bingo " + slug + "\",\"format\":\"bingo\",\"phase\":\"live\","
+		return "{\"number\":" + number + ",\"name\":\"Bingo " + number + "\",\"format\":\"bingo\",\"phase\":\"live\","
 			+ "\"entry\":\"on_roster\",\"watch\":" + watch + (extra.isEmpty() ? "" : "," + extra) + "}";
 	}
 
-	private static WatchList watch(Set<String> left, String... events)
+	private static WatchList watch(Set<Integer> left, String... events)
 	{
 		DiscoveryResponse discovery = GSON.fromJson("{\"rsn\":\"Iron Man\",\"events\":["
 			+ String.join(",", events) + "]}", DiscoveryResponse.class);
@@ -30,17 +30,17 @@ public class WatchListTest
 	@Test
 	public void namesTheEventsAnItemIsWatchedIn()
 	{
-		WatchList list = watch(Set.of(), event("a", VISAGE, ""), event("b", VISAGE, ""), event("c", SNAKELING, ""));
+		WatchList list = watch(Set.of(), event(111111, VISAGE, ""), event(222222, VISAGE, ""), event(333333, SNAKELING, ""));
 
-		assertEquals(Set.of("a", "b"), list.eventsFor(11286));
+		assertEquals(Set.of(111111, 222222), list.eventsFor(11286));
 		assertEquals(Set.of(), list.eventsFor(4151));
-		assertEquals(Set.of("c"), list.clogSlotEvents());
+		assertEquals(Set.of(333333), list.clogSlotEvents());
 	}
 
 	@Test
 	public void findsAWatchedItemByTheNameChatUses()
 	{
-		WatchList list = watch(Set.of(), event("a", SNAKELING, ""));
+		WatchList list = watch(Set.of(), event(111111, SNAKELING, ""));
 
 		assertEquals(Integer.valueOf(12921), list.idForName("pet snakeling"));
 		assertNull(list.idForName("Pet kraken"));
@@ -50,7 +50,7 @@ public class WatchListTest
 	public void cannotPinANameTwoWatchedIdsShare()
 	{
 		WatchList list = watch(Set.of(),
-			event("a", "{\"items\":[{\"id\":1,\"name\":\"Dossier\"},{\"id\":2,\"name\":\"Dossier\"}]}", ""));
+			event(111111, "{\"items\":[{\"id\":1,\"name\":\"Dossier\"},{\"id\":2,\"name\":\"Dossier\"}]}", ""));
 
 		assertNull(list.idForName("Dossier"));
 	}
@@ -58,21 +58,21 @@ public class WatchListTest
 	@Test
 	public void watchesOnlyLiveEventsStillOnTheRosterAndNotLeft()
 	{
-		WatchList list = watch(Set.of("left"),
-			event("left", VISAGE, ""),
-			event("removed", VISAGE, "\"entry\":\"removed\""),
-			event("scheduled", VISAGE, "\"phase\":\"scheduled\""),
-			event("ended", VISAGE, "\"phase\":\"ended\""),
-			event("held", VISAGE, "\"entry\":\"held\""));
+		WatchList list = watch(Set.of(100001),
+			event(100001, VISAGE, ""),
+			event(100002, VISAGE, "\"entry\":\"removed\""),
+			event(100003, VISAGE, "\"phase\":\"scheduled\""),
+			event(100004, VISAGE, "\"phase\":\"ended\""),
+			event(100005, VISAGE, "\"entry\":\"held\""));
 
 		// A held entry's Submissions are kept, and count if the identity check settles in its favour
-		assertEquals(Set.of("held"), list.eventsFor(11286));
+		assertEquals(Set.of(100005), list.eventsFor(11286));
 	}
 
 	@Test
 	public void watchesNothingWithoutAWatchFromTheServer()
 	{
-		WatchList list = watch(Set.of(), "{\"slug\":\"a\",\"phase\":\"live\",\"entry\":\"on_roster\"}");
+		WatchList list = watch(Set.of(), "{\"number\":111111,\"phase\":\"live\",\"entry\":\"on_roster\"}");
 
 		assertEquals(Set.of(), list.eventsFor(11286));
 		assertEquals(Set.of(), list.clogSlotEvents());

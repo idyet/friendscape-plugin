@@ -49,7 +49,7 @@ class SubmissionDetector
 		String name;
 		int quantity;
 		/** The Events whose open Tiles watch it: the queue keeps it while any of them may count it. */
-		Set<String> events;
+		Set<Integer> events;
 	}
 
 	private final IntUnaryOperator canonicalize;
@@ -98,7 +98,7 @@ class SubmissionDetector
 		List<Drop> drops = new ArrayList<>();
 		quantities.forEach((id, quantity) ->
 		{
-			Set<String> events = watch.eventsFor(id);
+			Set<Integer> events = watch.eventsFor(id);
 			if (!events.isEmpty())
 			{
 				drops.add(new Drop(Kind.ITEM, id, itemName.apply(id), quantity, events));
