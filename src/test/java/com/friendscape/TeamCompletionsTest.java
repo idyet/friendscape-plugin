@@ -36,7 +36,7 @@ public class TeamCompletionsTest
 			tiles.append(i == 0 ? "" : ",").append("{\"state\":\"open\",\"tier\":")
 				.append(tier == 0 ? "null" : tier).append(",\"fill\":0}");
 		}
-		return "{\"teamId\":" + id + ",\"name\":\"" + name + "\",\"rank\":1,\"of\":2,\"points\":0,"
+		return "{\"team\":" + id + ",\"name\":\"" + name + "\",\"rank\":1,\"of\":2,\"points\":0,"
 			+ "\"mine\":" + mine + ",\"tiles\":[" + tiles + "]}";
 	}
 

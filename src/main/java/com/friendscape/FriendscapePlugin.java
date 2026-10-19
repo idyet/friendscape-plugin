@@ -232,15 +232,15 @@ public class FriendscapePlugin extends Plugin
 			}
 
 			@Override
-			public void openBoard(int number, int teamId)
+			public void openBoard(int number, int teamNumber)
 			{
-				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, number, teamId));
+				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, number, teamNumber));
 			}
 
 			@Override
-			public void openTile(int number, int teamId, int tile)
+			public void openTile(int number, int teamNumber, int tile)
 			{
-				LinkBrowser.browse(FriendscapeApi.tilePage(apiBase, number, teamId, tile));
+				LinkBrowser.browse(FriendscapeApi.tilePage(apiBase, number, teamNumber, tile));
 			}
 
 			@Override

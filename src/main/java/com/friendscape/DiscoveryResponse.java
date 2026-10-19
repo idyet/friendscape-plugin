@@ -150,7 +150,8 @@ class DiscoveryResponse
 	@Value
 	static class BoardTeam
 	{
-		int teamId;
+		/** The Team number within the Event: Team links and the remembered Team use it. */
+		int team;
 		String name;
 		int rank;
 		/** How many Teams the Event ranks. */

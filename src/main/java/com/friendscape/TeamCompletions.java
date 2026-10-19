@@ -33,7 +33,7 @@ class TeamCompletions
 				{
 					tiers[position] = team.tier(position);
 				}
-				int[] before = seen.put(event.getNumber() + ":" + team.getTeamId(), tiers);
+				int[] before = seen.put(event.getNumber() + ":" + team.getTeam(), tiers);
 				if (before == null || before.length != tiers.length)
 				{
 					continue;

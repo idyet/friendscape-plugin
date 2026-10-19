@@ -44,15 +44,15 @@ public class FriendscapePanelTest
 		}
 
 		@Override
-		public void openBoard(int number, int teamId)
+		public void openBoard(int number, int teamNumber)
 		{
-			actions.add("board " + number + " team " + teamId);
+			actions.add("board " + number + " team " + teamNumber);
 		}
 
 		@Override
-		public void openTile(int number, int teamId, int tile)
+		public void openTile(int number, int teamNumber, int tile)
 		{
-			actions.add("tile " + number + " team " + teamId + " #" + tile);
+			actions.add("tile " + number + " team " + teamNumber + " #" + tile);
 		}
 
 		@Override
@@ -221,10 +221,10 @@ public class FriendscapePanelTest
 	{
 		String json = "{\"size\":2,\"tiles\":[{\"number\":1,\"name\":\"Blood shards\",\"tiers\":1},"
 			+ "{\"number\":2,\"name\":\"Vorkath\",\"tiers\":3}],\"teams\":["
-			+ "{\"teamId\":2,\"name\":\"Blue\",\"rank\":1,\"of\":2,\"points\":9,\"mine\":false,\"tiles\":["
+			+ "{\"team\":2,\"name\":\"Blue\",\"rank\":1,\"of\":2,\"points\":9,\"mine\":false,\"tiles\":["
 			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":1},{\"state\":\"open\",\"tier\":null,\"fill\":0},"
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]},"
-			+ "{\"teamId\":1,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":0,\"mine\":true,\"tiles\":["
+			+ "{\"team\":1,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":0,\"mine\":true,\"tiles\":["
 			+ "{\"state\":\"open\",\"tier\":null,\"fill\":0.5},{\"state\":\"open\",\"tier\":1,\"fill\":0.25},"
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);

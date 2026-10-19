@@ -45,9 +45,9 @@ class MiniBoardView extends JPanel
 	/** What the board asks of the card. Called on the Swing thread. */
 	interface Listener
 	{
-		void teamChosen(int teamId);
+		void teamChosen(int teamNumber);
 
-		void openTile(int teamId, int number);
+		void openTile(int teamNumber, int number);
 	}
 
 	/** What a card leaves for the grid: the side panel less its border and the card's padding. */
@@ -69,7 +69,7 @@ class MiniBoardView extends JPanel
 	private final JPanel grid = new JPanel();
 	private int shownTeam;
 
-	MiniBoardView(DiscoveryResponse.Board board, int teamId, TileIcons icons, Listener listener)
+	MiniBoardView(DiscoveryResponse.Board board, int teamNumber, TileIcons icons, Listener listener)
 	{
 		this.board = board;
 		this.icons = icons;
@@ -89,8 +89,8 @@ class MiniBoardView extends JPanel
 			chip.setMargin(new Insets(1, 4, 1, 4));
 			chip.addActionListener(e ->
 			{
-				showTeam(team.getTeamId());
-				listener.teamChosen(team.getTeamId());
+				showTeam(team.getTeam());
+				listener.teamChosen(team.getTeam());
 			});
 			chips.add(chip);
 			chipRow.add(chip);
@@ -116,7 +116,7 @@ class MiniBoardView extends JPanel
 		add(chipRow);
 		add(standing);
 		add(grid);
-		showTeam(teamId);
+		showTeam(teamNumber);
 	}
 
 	/** The side of one square: as large as the card allows, up to a sprite's size. */
@@ -132,22 +132,22 @@ class MiniBoardView extends JPanel
 	}
 
 	/** Shows a Team's board; an unknown Team shows the first. */
-	void showTeam(int teamId)
+	void showTeam(int teamNumber)
 	{
 		List<DiscoveryResponse.BoardTeam> teams = board.teams();
 		DiscoveryResponse.BoardTeam team = teams.isEmpty() ? null : teams.get(0);
 		for (DiscoveryResponse.BoardTeam candidate : teams)
 		{
-			if (candidate.getTeamId() == teamId)
+			if (candidate.getTeam() == teamNumber)
 			{
 				team = candidate;
 			}
 		}
-		shownTeam = team == null ? teamId : team.getTeamId();
+		shownTeam = team == null ? teamNumber : team.getTeam();
 		standing.setText(team == null ? "" : team.getName() + ": " + EventCard.bingoPlace(team));
 		for (int i = 0; i < chips.size(); i++)
 		{
-			chips.get(i).setSelected(teams.get(i).getTeamId() == shownTeam);
+			chips.get(i).setSelected(teams.get(i).getTeam() == shownTeam);
 		}
 
 		grid.removeAll();

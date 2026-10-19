@@ -46,10 +46,10 @@ class FriendscapePanel extends PluginPanel
 		void report(int number);
 
 		/** A Team's board page, for a board too large for the card. */
-		void openBoard(int number, int teamId);
+		void openBoard(int number, int teamNumber);
 
 		/** One Tile's detail on a Team's board page. */
-		void openTile(int number, int teamId, int tile);
+		void openTile(int number, int teamNumber, int tile);
 
 		/** Remembers whether a card's mini board is open, per Event. */
 		void setBoardOpen(int number, boolean open);
@@ -180,7 +180,7 @@ class FriendscapePanel extends PluginPanel
 	{
 		List<DiscoveryResponse.BoardTeam> mine = board.mine();
 		List<DiscoveryResponse.BoardTeam> teams = mine.isEmpty() ? board.teams() : mine;
-		return teams.isEmpty() ? 0 : teams.get(0).getTeamId();
+		return teams.isEmpty() ? 0 : teams.get(0).getTeam();
 	}
 
 	private boolean askLeave(String eventName)
@@ -327,8 +327,8 @@ class FriendscapePanel extends PluginPanel
 		{
 			int number = card.getNumber();
 			Integer remembered = shownTeams.get(number);
-			int teamId = remembered != null ? remembered : defaultTeam(card.miniBoard());
-			return new MiniBoardView(card.miniBoard(), teamId, icons, new MiniBoardView.Listener()
+			int teamNumber = remembered != null ? remembered : defaultTeam(card.miniBoard());
+			return new MiniBoardView(card.miniBoard(), teamNumber, icons, new MiniBoardView.Listener()
 			{
 				@Override
 				public void teamChosen(int chosen)

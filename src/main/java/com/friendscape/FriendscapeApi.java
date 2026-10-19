@@ -93,21 +93,21 @@ class FriendscapeApi
 	}
 
 	/** A Team's board page: {@code /e/<number>/t/<team>}. */
-	static String teamPage(HttpUrl base, int number, int teamId)
+	static String teamPage(HttpUrl base, int number, int teamNumber)
 	{
-		return teamPageUrl(base, number, teamId).build().toString();
+		return teamPageUrl(base, number, teamNumber).build().toString();
 	}
 
 	/** One Tile's detail on a Team's board page: {@code /e/<number>/t/<team>?tile=<n>}. */
-	static String tilePage(HttpUrl base, int number, int teamId, int tile)
+	static String tilePage(HttpUrl base, int number, int teamNumber, int tile)
 	{
-		return teamPageUrl(base, number, teamId).addQueryParameter("tile", Integer.toString(tile)).build().toString();
+		return teamPageUrl(base, number, teamNumber).addQueryParameter("tile", Integer.toString(tile)).build().toString();
 	}
 
-	private static HttpUrl.Builder teamPageUrl(HttpUrl base, int number, int teamId)
+	private static HttpUrl.Builder teamPageUrl(HttpUrl base, int number, int teamNumber)
 	{
 		return base.newBuilder().encodedPath("/e/").addPathSegment(Integer.toString(number)).addPathSegment("t")
-			.addPathSegment(Integer.toString(teamId)).query(null);
+			.addPathSegment(Integer.toString(teamNumber)).query(null);
 	}
 
 	private static Map<String, Object> identity(String rsn, long accountHash)

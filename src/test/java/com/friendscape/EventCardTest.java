@@ -215,8 +215,8 @@ public class EventCardTest
 			tiles.append(i == 0 ? "" : ",").append("{\"state\":\"open\",\"tier\":null,\"fill\":0}");
 		}
 		return card("\"format\":\"bingo\",\"standing\":null,\"board\":{\"size\":" + size + ",\"tiles\":[],\"teams\":["
-			+ "{\"teamId\":2,\"name\":\"Blue\",\"rank\":1,\"of\":3,\"points\":1200,\"mine\":false,\"tiles\":[" + tiles + "]},"
-			+ "{\"teamId\":1,\"name\":\"Red\",\"rank\":2,\"of\":3,\"points\":340,\"mine\":true,\"tiles\":[" + tiles + "]}]}"
+			+ "{\"team\":2,\"name\":\"Blue\",\"rank\":1,\"of\":3,\"points\":1200,\"mine\":false,\"tiles\":[" + tiles + "]},"
+			+ "{\"team\":1,\"name\":\"Red\",\"rank\":2,\"of\":3,\"points\":340,\"mine\":true,\"tiles\":[" + tiles + "]}]}"
 			+ (extra.isEmpty() ? "" : "," + extra));
 	}
 
