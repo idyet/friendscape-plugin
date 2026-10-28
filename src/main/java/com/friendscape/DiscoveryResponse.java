@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import lombok.Value;
+import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -67,6 +68,89 @@ class DiscoveryResponse
 		Watch watch;
 		/** A bingo Event's mini board with every Team's standing; null on a metric Event or older server. */
 		Board board;
+		/** A Series Event's Vote while votes are taken; null otherwise, and from older servers. */
+		@With
+		Vote vote;
+	}
+
+	/** A Series Event's Vote as the card's picker shows it (SPEC 10.3): counts only, never who voted. */
+	@Value
+	static class Vote
+	{
+		/** The Any mode tally shows this many voted Candidates, then how many more have votes. */
+		static final int TALLY_TOP = 3;
+
+		String closesAt;
+		/** Any mode: every skill or boss, offered as a dropdown under the top voted. */
+		boolean open;
+		/** In Ballot order. */
+		List<VoteCandidate> candidates;
+		/** The Candidate id the player voted for from the plugin; null until then. */
+		Integer choice;
+
+		List<VoteCandidate> candidates()
+		{
+			return candidates == null ? List.of() : candidates;
+		}
+
+		/**
+		 * Any mode's tally: the top voted Candidates by count, ties in Ballot order, then
+		 * "+N more with votes"; "No votes yet" when none has any.
+		 */
+		List<String> tally()
+		{
+			List<VoteCandidate> voted = new ArrayList<>();
+			for (VoteCandidate candidate : candidates())
+			{
+				if (candidate.votes() > 0)
+				{
+					voted.add(candidate);
+				}
+			}
+			if (voted.isEmpty())
+			{
+				return List.of("No votes yet");
+			}
+			// A stable sort keeps Ballot order among ties
+			voted.sort(Comparator.comparingInt(VoteCandidate::votes).reversed());
+			List<String> lines = new ArrayList<>();
+			for (VoteCandidate candidate : voted.subList(0, Math.min(TALLY_TOP, voted.size())))
+			{
+				lines.add(candidate.getName() + ": " + candidate.votes());
+			}
+			if (voted.size() > TALLY_TOP)
+			{
+				lines.add("+" + (voted.size() - TALLY_TOP) + " more with votes");
+			}
+			return lines;
+		}
+	}
+
+	@Value
+	static class VoteCandidate
+	{
+		/** The Ballot place, from 1: what a vote names. */
+		int id;
+		/** What the Candidate measures: a skill or boss name. */
+		String name;
+		/** Null shows no picture. */
+		TileIcon icon;
+		/** Absent in Any mode on a Candidate nobody voted for. */
+		Integer count;
+		/** On Cooldown: shown, never votable. */
+		boolean cooling;
+
+		int votes()
+		{
+			return count == null ? 0 : count;
+		}
+
+		/** The dropdown's line. */
+		@Override
+		public String toString()
+		{
+			return cooling ? name + " (On Cooldown)" : name;
+		}
 	}
 
 	/** A bingo Event's board as the mini board shows it (SPEC 10.3): what the website shows. */
@@ -241,6 +325,17 @@ class DiscoveryResponse
 	List<DiscoveredEvent> events()
 	{
 		return events == null ? List.of() : events;
+	}
+
+	/** This answer with the Vote of Event {@code number} swapped for one a vote answered. */
+	DiscoveryResponse withVote(int number, Vote vote)
+	{
+		List<DiscoveredEvent> swapped = new ArrayList<>();
+		for (DiscoveredEvent event : events())
+		{
+			swapped.add(event.getNumber() == number ? event.withVote(vote) : event);
+		}
+		return new DiscoveryResponse(rsn, swapped);
 	}
 
 	/** Event names by Event number, for chat lines. */

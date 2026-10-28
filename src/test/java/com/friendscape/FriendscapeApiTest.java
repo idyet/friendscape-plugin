@@ -389,6 +389,44 @@ public class FriendscapeApiTest
 		assertEquals(FriendscapeApi.REPORT_FAILED, report(api(clientAnswering(502, "bad gateway"))));
 	}
 
+	/** What a vote heard: {@code choice <n>} for an answer, else the message for the player. */
+	private String vote(FriendscapeApi api) throws InterruptedException
+	{
+		CountDownLatch done = new CountDownLatch(1);
+		AtomicReference<String> heard = new AtomicReference<>();
+		api.vote("Iron Man", 7L, 123456, 2, answered ->
+		{
+			heard.set("choice " + answered.getChoice());
+			done.countDown();
+		}, message ->
+		{
+			heard.set(message);
+			done.countDown();
+		});
+		done.await(2, TimeUnit.SECONDS);
+		return heard.get();
+	}
+
+	@Test
+	public void aVoteCarriesTheIdentityCardAndCandidateAndAnswersTheVote() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"vote\":{\"closesAt\":\"2026-11-05T18:00:00.000Z\","
+			+ "\"open\":false,\"candidates\":[],\"choice\":2}}"));
+
+		assertEquals("choice 2", vote(api));
+		assertEquals(List.of("https://friendscape.test/api/v1/plugin/vote"), requestedUrls);
+		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"number\":123456,\"candidate\":2}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void aRefusedVoteTellsTheServersReason() throws InterruptedException
+	{
+		assertEquals("On Cooldown this week", vote(api(clientAnswering(409, "{\"error\":\"On Cooldown this week\"}"))));
+		assertEquals(FriendscapeApi.VOTE_FAILED, vote(api(clientAnswering(502, "bad gateway"))));
+		assertEquals(FriendscapeApi.VOTE_FAILED, vote(api(clientAnswering(200, "{}"))));
+	}
+
 	private static final QueuedSubmission VISAGE = new QueuedSubmission("3f1c2a9e", "-4611686018427387904",
 		"Iron Man", "item", 11286, "Draconic visage", 2, "2026-11-03T12:00:00Z", List.of(123456));
 

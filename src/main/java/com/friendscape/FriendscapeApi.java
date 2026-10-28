@@ -208,6 +208,76 @@ class FriendscapeApi
 		}, error -> onMessage.accept(REPORT_FAILED));
 	}
 
+	static final String VOTE_FAILED = "Could not vote. Try again later.";
+
+	/** The server's answer to a vote: the Vote as it now stands. */
+	@Value
+	static class VoteAnswer
+	{
+		DiscoveryResponse.Vote vote;
+	}
+
+	/** The body of a refusal: {@code {"error"}}. */
+	@Value
+	static class ErrorAnswer
+	{
+		String error;
+	}
+
+	/**
+	 * Votes from the card of Event {@code number} for the Candidate {@code candidate} (its Ballot
+	 * place, SPEC 4.9). {@code onVote} hears the Vote as it now stands; {@code onRefused} what to tell
+	 * the player instead. Either comes back on an OkHttp thread; nothing for a call refused here or
+	 * cancelled.
+	 */
+	void vote(String rsn, long accountHash, int number, int candidate, Consumer<DiscoveryResponse.Vote> onVote,
+		Consumer<String> onRefused)
+	{
+		Map<String, Object> body = identity(rsn, accountHash);
+		body.put("number", number);
+		body.put("candidate", candidate);
+		Request request = new Request.Builder()
+			.url(base.resolve("v1/plugin/vote"))
+			.post(RequestBody.create(JSON, gson.toJson(body)))
+			.build();
+		enqueue(request, response ->
+		{
+			if (response.code() >= 400 && response.code() < 500)
+			{
+				String error = errorMessage(response);
+				onRefused.accept(error == null ? VOTE_FAILED : error);
+				return;
+			}
+			VoteAnswer answer = parse(response, VoteAnswer.class);
+			if (answer == null || answer.getVote() == null)
+			{
+				onRefused.accept(VOTE_FAILED);
+				return;
+			}
+			onVote.accept(answer.getVote());
+		}, error -> onRefused.accept(VOTE_FAILED));
+	}
+
+	/** A refusal's {@code error}, worded for the player by the server; null when it has none. */
+	private String errorMessage(Response response)
+	{
+		ResponseBody body = response.body();
+		if (body == null)
+		{
+			return null;
+		}
+		try
+		{
+			ErrorAnswer answer = gson.fromJson(body.charStream(), ErrorAnswer.class);
+			return answer == null ? null : answer.getError();
+		}
+		catch (JsonParseException e)
+		{
+			log.debug("Unreadable refusal from {}", response.request().url(), e);
+			return null;
+		}
+	}
+
 	/** How a Submission send ended; called back on an OkHttp thread, not at all if refused here or cancelled. */
 	interface SubmissionCallback
 	{

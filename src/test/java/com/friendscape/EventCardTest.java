@@ -257,4 +257,27 @@ public class EventCardTest
 		assertNull(card("").getBoard());
 		assertEquals("Open event page", card("").getLink());
 	}
+
+	private static final String VOTE = "\"phase\":\"published\",\"standing\":null,"
+		+ "\"vote\":{\"closesAt\":\"2026-11-05T18:00:00.000Z\",\"open\":false,"
+		+ "\"candidates\":[{\"id\":1,\"name\":\"Fishing\",\"count\":0,\"cooling\":false}],\"choice\":null}";
+
+	@Test
+	public void votesWhileASeriesEventsVoteIsOpen()
+	{
+		EventCard card = card(VOTE);
+
+		assertEquals(CardState.VOTING, card.getState());
+		assertEquals("Voting, closes 5 Nov 18:00", card.getDetail());
+		assertEquals("Fishing", card.getVote().candidates().get(0).getName());
+	}
+
+	@Test
+	public void offersNoVoteOnceLeft()
+	{
+		EventCard card = EventCard.of(event(VOTE), true, EventCard.Queued.NONE, ZoneOffset.UTC);
+
+		assertEquals(CardState.LEFT, card.getState());
+		assertNull(card.getVote());
+	}
 }

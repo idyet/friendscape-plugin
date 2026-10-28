@@ -244,6 +244,31 @@ public class FriendscapePlugin extends Plugin
 			}
 
 			@Override
+			public void vote(int number, int candidate)
+			{
+				String name = rsn;
+				if (name == null)
+				{
+					return;
+				}
+				int sentIn = session.get();
+				api.vote(name, accountHash, number, candidate, vote ->
+				{
+					DiscoveryResponse found = discovery;
+					if (session.get() == sentIn && found != null)
+					{
+						discovery = found.withVote(number, vote);
+						refreshPanel();
+					}
+				}, message ->
+				{
+					chat(message, ChatColorType.NORMAL);
+					// The card may be stale: the Vote closed, or a Candidate went On Cooldown
+					discover();
+				});
+			}
+
+			@Override
 			public void setBoardOpen(int number, boolean open)
 			{
 				Set<Integer> closed = new HashSet<>(StoredEventNumbers.parse(config.closedBoards()));

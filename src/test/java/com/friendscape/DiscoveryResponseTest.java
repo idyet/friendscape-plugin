@@ -3,6 +3,7 @@ package com.friendscape;
 import com.google.gson.Gson;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -160,5 +161,59 @@ public class DiscoveryResponseTest
 			.map(ReadingsResponse.EventReading::getStatus).collect(Collectors.toList());
 
 		assertEquals(List.of("counted", "not_started", "ended", "held", "not_on_roster", "ended"), statuses);
+	}
+
+	private static final String LIST_VOTE = "\"vote\":{\"closesAt\":\"2026-11-05T18:00:00.000Z\",\"open\":false,"
+		+ "\"candidates\":[{\"id\":1,\"name\":\"Fishing\",\"icon\":{\"kind\":\"xp\",\"skill\":\"fishing\"},\"count\":2,\"cooling\":false},"
+		+ "{\"id\":2,\"name\":\"Mining\",\"icon\":null,\"count\":0,\"cooling\":true}],\"choice\":1,\"later\":true}";
+
+	@Test
+	public void readsAVoteAndIgnoresFieldsItDoesNotKnow()
+	{
+		DiscoveryResponse response = parse(event(111111, "published", "on_roster", LIST_VOTE + ",\"newer\":{\"x\":1}"));
+
+		DiscoveryResponse.Vote vote = response.events().get(0).getVote();
+		assertEquals(Integer.valueOf(1), vote.getChoice());
+		assertEquals("Fishing", vote.candidates().get(0).getName());
+		assertEquals(2, vote.candidates().get(0).votes());
+		assertTrue(vote.candidates().get(1).isCooling());
+	}
+
+	@Test
+	public void swapsInTheVoteAVoteAnswered()
+	{
+		DiscoveryResponse response = parse(event(111111, "published", "on_roster", LIST_VOTE),
+			event(222222, "live", "on_roster", ""));
+		DiscoveryResponse.Vote answered = GSON.fromJson("{\"closesAt\":\"2026-11-05T18:00:00.000Z\",\"open\":false,"
+			+ "\"candidates\":[],\"choice\":2}", DiscoveryResponse.Vote.class);
+
+		DiscoveryResponse swapped = response.withVote(111111, answered);
+
+		assertEquals(Integer.valueOf(2), swapped.events().get(0).getVote().getChoice());
+		assertEquals(null, swapped.events().get(1).getVote());
+		assertEquals("Iron Man", swapped.getRsn());
+	}
+
+	private static DiscoveryResponse.Vote anyVote(String counts)
+	{
+		String[] names = {"Attack", "Defence", "Strength", "Hitpoints", "Ranged"};
+		String[] each = counts.split(",");
+		List<String> candidates = new ArrayList<>();
+		for (int i = 0; i < names.length; i++)
+		{
+			candidates.add("{\"id\":" + (i + 1) + ",\"name\":\"" + names[i] + "\""
+				+ (each[i].equals("-") ? "" : ",\"count\":" + each[i]) + ",\"cooling\":false}");
+		}
+		return GSON.fromJson("{\"closesAt\":\"2026-11-05T18:00:00.000Z\",\"open\":true,\"candidates\":["
+			+ String.join(",", candidates) + "],\"choice\":null}", DiscoveryResponse.Vote.class);
+	}
+
+	@Test
+	public void talliesTheTopThreeVotedByCountTiesInBallotOrder()
+	{
+		assertEquals(List.of("Strength: 4", "Defence: 2", "Ranged: 2", "+1 more with votes"),
+			anyVote("1,2,4,-,2").tally());
+		assertEquals(List.of("Hitpoints: 1"), anyVote("-,-,-,1,-").tally());
+		assertEquals(List.of("No votes yet"), anyVote("-,-,-,-,-").tally());
 	}
 }

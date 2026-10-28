@@ -40,6 +40,8 @@ class EventCard
 	boolean report;
 	/** Live, still on the Roster and not left: the only cards the overlay shows. */
 	boolean live;
+	/** The open Vote the card's picker shows; null unless Voting. */
+	DiscoveryResponse.Vote vote;
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -80,7 +82,8 @@ class EventCard
 		boolean live = DiscoveryResponse.LIVE.equals(event.getPhase()) && !left
 			&& !DiscoveryResponse.REMOVED.equals(event.getEntry());
 		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
-			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live);
+			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
+			state == CardState.VOTING ? event.getVote() : null);
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */
@@ -159,6 +162,10 @@ class EventCard
 		{
 			return CardState.ENDED;
 		}
+		if (DiscoveryResponse.PUBLISHED.equals(phase) && event.getVote() != null)
+		{
+			return CardState.VOTING;
+		}
 		if (DiscoveryResponse.PUBLISHED.equals(phase))
 		{
 			return CardState.NOT_SCHEDULED;
@@ -187,6 +194,9 @@ class EventCard
 				return items == 1 ? "1 item needs a screenshot" : items + " items need a screenshot";
 			case NOT_SCHEDULED:
 				return "Not scheduled yet";
+			case VOTING:
+				Instant closesAt = DiscoveryResponse.parse(event, event.getVote().getClosesAt());
+				return closesAt == null ? "Voting" : "Voting, closes " + STARTS.format(closesAt.atZone(zone));
 			default:
 				Instant startsAt = DiscoveryResponse.parse(event, event.getStartsAt());
 				if (DiscoveryResponse.SCHEDULED.equals(event.getPhase()) && startsAt != null)

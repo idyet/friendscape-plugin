@@ -17,6 +17,8 @@ enum CardState
 	NOT_ON_ROSTER(new Color(0x4D9DE0)),
 	/** Muted on this install; the server is never told. */
 	LEFT(ColorScheme.MEDIUM_GRAY_COLOR),
+	/** A Series Event whose Vote is open: the card carries the Ballot. */
+	VOTING(new Color(0xB57EDC)),
 	/** Published with no start and end set yet. */
 	NOT_SCHEDULED(ColorScheme.LIGHT_GRAY_COLOR),
 	ENDED(ColorScheme.LIGHT_GRAY_COLOR),

@@ -60,12 +60,18 @@ public class FriendscapePanelTest
 		{
 			actions.add((open ? "show board " : "hide board ") + number);
 		}
+
+		@Override
+		public void vote(int number, int candidate)
+		{
+			actions.add("vote " + number + " #" + candidate);
+		}
 	}, MiniBoardView.TileIcons.NONE);
 
 	private static EventCard card(int number, CardState state, List<String> standing)
 	{
 		return new EventCard(number, "Event " + number, state, "detail " + number, standing, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, true);
+			EventCard.OPEN_EVENT_PAGE, false, false, true, null);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -178,7 +184,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true)));
+			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -187,7 +193,7 @@ public class FriendscapePanelTest
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true)));
+			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -204,7 +210,7 @@ public class FriendscapePanelTest
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION,
 			"On hold while Friendscape checks this RSN", List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
-			false, true, true)));
+			false, true, true, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.reportButton.isVisible());
@@ -229,7 +235,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true);
+			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null);
 	}
 
 	@Test
@@ -254,7 +260,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), List.of(),
-			"", large, EventCard.OPEN_BOARD, false, false, true)));
+			"", large, EventCard.OPEN_BOARD, false, false, true, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);
@@ -378,5 +384,92 @@ public class FriendscapePanelTest
 
 		assertTrue(panel.cardViews.isEmpty());
 		assertFalse(panel.emptyState.isVisible());
+	}
+
+	/** A Voting card: Fishing (2 votes, the player's choice unless {@code choice} says otherwise), Mining On Cooldown, Cooking. */
+	private static EventCard votingCard(boolean any, String choice)
+	{
+		String json = "{\"closesAt\":\"2026-11-05T18:00:00.000Z\",\"open\":" + any + ",\"candidates\":["
+			+ "{\"id\":1,\"name\":\"Fishing\",\"count\":2,\"cooling\":false},"
+			+ "{\"id\":2,\"name\":\"Mining\"" + (any ? "" : ",\"count\":0") + ",\"cooling\":true},"
+			+ "{\"id\":3,\"name\":\"Cooking\"" + (any ? "" : ",\"count\":0") + ",\"cooling\":false}],"
+			+ "\"choice\":" + choice + "}";
+		DiscoveryResponse.Vote vote = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Vote.class);
+		return new EventCard(333333, "Skill of the week #1", CardState.VOTING, "Voting, closes 5 Nov 18:00", List.of(),
+			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote);
+	}
+
+	@Test
+	public void listsACandidateListBallotWithCountsTheChoiceAndCooldownsDisabled()
+	{
+		panel.update(discovered(votingCard(false, "1")));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertEquals(List.of("Fishing: 2 (your vote)", "Mining (On Cooldown)", "Cooking: 0"), view.ballotTexts());
+		assertTrue(view.ballot.get(0).isSelected());
+		assertFalse(view.ballot.get(1).isEnabled());
+		assertTrue(view.ballot.get(2).isEnabled());
+		assertTrue(view.voteNote.isVisible());
+		assertEquals("Cast in game, website changes blocked", view.voteNote.getText());
+		assertFalse("the choice is already cast", view.voteButton.isEnabled());
+
+		view.ballot.get(2).doClick();
+		assertTrue(view.voteButton.isEnabled());
+		view.voteButton.doClick();
+
+		assertEquals(List.of("vote 333333 #3"), actions);
+	}
+
+	@Test
+	public void offersNoNoteBeforeThePlayerVotes()
+	{
+		panel.update(discovered(votingCard(false, "null")));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertFalse(view.voteNote.isVisible());
+		assertFalse(view.voteButton.isEnabled());
+		assertEquals("Vote", view.voteButton.getText());
+	}
+
+	@Test
+	public void keepsAPickAcrossTheMinutelyRefresh()
+	{
+		panel.update(discovered(votingCard(false, "null")));
+		panel.cardViews.get(0).ballot.get(2).doClick();
+
+		panel.update(discovered(votingCard(false, "null")));
+
+		assertTrue(panel.cardViews.get(0).ballot.get(2).isSelected());
+		assertTrue(panel.cardViews.get(0).voteButton.isEnabled());
+	}
+
+	@Test
+	public void offersAnAnyBallotAsTheTopVotedAndADropdown()
+	{
+		panel.update(discovered(votingCard(true, "3")));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.ballot.isEmpty());
+		assertEquals(List.of("Fishing: 2"), view.tallyTexts());
+		assertEquals(3, view.picker.getItemCount());
+		assertEquals(3, ((DiscoveryResponse.VoteCandidate) view.picker.getSelectedItem()).getId());
+		assertFalse(view.voteButton.isEnabled());
+
+		view.picker.setSelectedIndex(1);
+		assertEquals("an On Cooldown Candidate cannot be picked", 3,
+			((DiscoveryResponse.VoteCandidate) view.picker.getSelectedItem()).getId());
+
+		view.picker.setSelectedIndex(0);
+		view.voteButton.doClick();
+		assertEquals(List.of("vote 333333 #1"), actions);
+	}
+
+	@Test
+	public void showsNoBallotOnAnyOtherCard()
+	{
+		panel.update(discovered(card(111111, CardState.TRACKING, List.of())));
+
+		assertFalse(panel.cardViews.get(0).voteButton.isVisible());
+		assertTrue(panel.cardViews.get(0).ballot.isEmpty());
 	}
 }

@@ -1,6 +1,7 @@
 package com.friendscape;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
 import java.util.ArrayList;
@@ -11,14 +12,20 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.ButtonGroup;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JRadioButton;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
@@ -53,7 +60,12 @@ class FriendscapePanel extends PluginPanel
 
 		/** Remembers whether a card's mini board is open, per Event. */
 		void setBoardOpen(int number, boolean open);
+
+		/** Votes from a Voting card for a Candidate, by its Ballot place (SPEC 4.9). */
+		void vote(int number, int candidate);
 	}
+
+	static final String VOTE_NOTE = "Cast in game, website changes blocked";
 
 	static final String LEAVE_CONFIRM = "Stop sending for %s from this install?\n\n"
 		+ "Your progress and Roster entry stay, and the organizer can still track you through the hiscores. "
@@ -75,6 +87,8 @@ class FriendscapePanel extends PluginPanel
 	private final MiniBoardView.TileIcons icons;
 	/** The Team each mini board shows, by Event number; kept across updates, not across restarts. */
 	private final Map<Integer, Integer> shownTeams = new HashMap<>();
+	/** The Candidate picked on each Voting card but not yet cast, so the minutely refresh keeps it. */
+	private final Map<Integer, Integer> picks = new HashMap<>();
 	/** Runs each time the panel is opened. */
 	private Runnable onOpen = () -> { };
 
@@ -175,6 +189,78 @@ class FriendscapePanel extends PluginPanel
 		onOpen.run();
 	}
 
+	/** A Candidate list row: "Fishing: 2", the player's choice marked, an On Cooldown one with no count. */
+	static String ballotLine(DiscoveryResponse.VoteCandidate candidate, Integer choice)
+	{
+		if (candidate.isCooling())
+		{
+			return candidate.toString();
+		}
+		String line = candidate.getName() + ": " + candidate.votes();
+		return choice != null && choice == candidate.getId() ? line + " (your vote)" : line;
+	}
+
+	/** Whether the Ballot holds the Candidate and it is not On Cooldown. */
+	private static boolean votable(DiscoveryResponse.Vote vote, int id)
+	{
+		for (DiscoveryResponse.VoteCandidate candidate : vote.candidates())
+		{
+			if (candidate.getId() == id)
+			{
+				return !candidate.isCooling();
+			}
+		}
+		return false;
+	}
+
+	/** A pick worth casting: votable and not the vote already cast. */
+	private static boolean castable(DiscoveryResponse.Vote vote, Integer picked)
+	{
+		return picked != null && votable(vote, picked) && !picked.equals(vote.getChoice());
+	}
+
+	/** The Any dropdown: every Candidate in Ballot order; an On Cooldown one is never selected. */
+	private static DefaultComboBoxModel<DiscoveryResponse.VoteCandidate> pickerModel(DiscoveryResponse.Vote vote,
+		Integer picked)
+	{
+		DefaultComboBoxModel<DiscoveryResponse.VoteCandidate> model = new DefaultComboBoxModel<>()
+		{
+			@Override
+			public void setSelectedItem(Object item)
+			{
+				if (!cooling(item))
+				{
+					super.setSelectedItem(item);
+				}
+			}
+		};
+		DiscoveryResponse.VoteCandidate selected = null;
+		for (DiscoveryResponse.VoteCandidate candidate : vote.candidates())
+		{
+			model.addElement(candidate);
+			if (picked != null && picked == candidate.getId())
+			{
+				selected = candidate;
+			}
+		}
+		// addElement selects the first; nothing shows picked until the player picks
+		model.setSelectedItem(selected);
+		return model;
+	}
+
+	private static boolean cooling(Object item)
+	{
+		return item instanceof DiscoveryResponse.VoteCandidate && ((DiscoveryResponse.VoteCandidate) item).isCooling();
+	}
+
+	private static JLabel smallLabel(String text, Color color)
+	{
+		JLabel label = new JLabel(text);
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setForeground(color);
+		return label;
+	}
+
 	/** The player's first Team, else the leader: what a mini board shows until a chip is chosen. */
 	private static int defaultTeam(DiscoveryResponse.Board board)
 	{
@@ -204,6 +290,14 @@ class FriendscapePanel extends PluginPanel
 		final JButton rejoinButton = new JButton("Rejoin");
 		final JButton menuButton = new JButton(Glyphs.more());
 		final JMenuItem leaveItem = new JMenuItem("Leave");
+		/** Candidate list mode: one radio per Candidate; empty otherwise. */
+		final List<JRadioButton> ballot = new ArrayList<>();
+		/** Any mode: the Any tally lines above the picker. */
+		final JPanel tally = new JPanel();
+		/** Any mode: every Candidate; null otherwise. */
+		final JComboBox<DiscoveryResponse.VoteCandidate> picker;
+		final JButton voteButton = new JButton("Vote");
+		final JLabel voteNote = new JLabel(VOTE_NOTE);
 
 		CardView(EventCard card, boolean boardOpen)
 		{
@@ -291,6 +385,13 @@ class FriendscapePanel extends PluginPanel
 				actions.report(card.getNumber());
 			});
 
+			JPanel ballotPanel = new JPanel();
+			ballotPanel.setLayout(new BoxLayout(ballotPanel, BoxLayout.Y_AXIS));
+			ballotPanel.setOpaque(false);
+			ballotPanel.setAlignmentX(LEFT_ALIGNMENT);
+			picker = card.getVote() != null && card.getVote().isOpen() ? new JComboBox<>() : null;
+			showBallot(card, ballotPanel);
+
 			board = card.miniBoard() == null ? null : miniBoard(card);
 			boardToggle.setVisible(board != null);
 			boardToggle.setAlignmentX(LEFT_ALIGNMENT);
@@ -313,6 +414,7 @@ class FriendscapePanel extends PluginPanel
 			add(title);
 			add(status);
 			add(standing);
+			add(ballotPanel);
 			add(uploadButton);
 			add(reportButton);
 			add(boardToggle);
@@ -321,6 +423,105 @@ class FriendscapePanel extends PluginPanel
 				add(board);
 			}
 			add(links);
+		}
+
+		/** The Ballot of a Voting card (SPEC 10.3); hides the Vote button on any other card. */
+		private void showBallot(EventCard card, JPanel ballotPanel)
+		{
+			DiscoveryResponse.Vote vote = card.getVote();
+			voteButton.setVisible(vote != null);
+			voteNote.setVisible(vote != null && vote.getChoice() != null);
+			if (vote == null)
+			{
+				return;
+			}
+			int number = card.getNumber();
+			Integer remembered = picks.get(number);
+			if (remembered != null && remembered.equals(vote.getChoice()))
+			{
+				// Cast: the card now marks it as the choice
+				picks.remove(number);
+				remembered = null;
+			}
+			Integer picked = remembered != null && votable(vote, remembered) ? remembered : vote.getChoice();
+			if (vote.isOpen())
+			{
+				tally.setLayout(new BoxLayout(tally, BoxLayout.Y_AXIS));
+				tally.setOpaque(false);
+				tally.setAlignmentX(LEFT_ALIGNMENT);
+				for (String line : vote.tally())
+				{
+					tally.add(smallLabel(line, ColorScheme.LIGHT_GRAY_COLOR));
+				}
+				ballotPanel.add(tally);
+				picker.setModel(pickerModel(vote, picked));
+				picker.setRenderer(new DefaultListCellRenderer()
+				{
+					@Override
+					public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+						boolean isSelected, boolean cellHasFocus)
+					{
+						Component shown = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus);
+						shown.setEnabled(!cooling(value));
+						return shown;
+					}
+				});
+				picker.setAlignmentX(LEFT_ALIGNMENT);
+				picker.addActionListener(e ->
+				{
+					DiscoveryResponse.VoteCandidate chosen = (DiscoveryResponse.VoteCandidate) picker.getSelectedItem();
+					pick(card, chosen == null ? null : chosen.getId());
+				});
+				ballotPanel.add(picker);
+			}
+			else
+			{
+				ButtonGroup group = new ButtonGroup();
+				for (DiscoveryResponse.VoteCandidate candidate : vote.candidates())
+				{
+					JRadioButton row = new JRadioButton(ballotLine(candidate, vote.getChoice()));
+					row.setFont(FontManager.getRunescapeSmallFont());
+					row.setOpaque(false);
+					row.setAlignmentX(LEFT_ALIGNMENT);
+					row.setEnabled(!candidate.isCooling());
+					row.setSelected(picked != null && picked == candidate.getId());
+					row.addActionListener(e -> pick(card, candidate.getId()));
+					group.add(row);
+					ballot.add(row);
+					ballotPanel.add(row);
+				}
+			}
+			voteButton.setText(vote.getChoice() == null ? "Vote" : "Change vote");
+			voteButton.setAlignmentX(LEFT_ALIGNMENT);
+			voteButton.setEnabled(castable(vote, picked));
+			voteButton.addActionListener(e ->
+			{
+				Integer chosen = picks.getOrDefault(number, vote.getChoice());
+				if (castable(vote, chosen))
+				{
+					// Until the answer refreshes the card: one vote per click
+					voteButton.setEnabled(false);
+					actions.vote(number, chosen);
+				}
+			});
+			voteNote.setFont(FontManager.getRunescapeSmallFont());
+			voteNote.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			voteNote.setAlignmentX(LEFT_ALIGNMENT);
+			ballotPanel.add(voteButton);
+			ballotPanel.add(voteNote);
+		}
+
+		private void pick(EventCard card, Integer candidate)
+		{
+			if (candidate == null)
+			{
+				picks.remove(card.getNumber());
+			}
+			else
+			{
+				picks.put(card.getNumber(), candidate);
+			}
+			voteButton.setEnabled(castable(card.getVote(), candidate));
 		}
 
 		private MiniBoardView miniBoard(EventCard card)
@@ -352,6 +553,26 @@ class FriendscapePanel extends PluginPanel
 				boardToggle.setText(open ? "Hide board" : "Show board");
 				revalidate();
 			}
+		}
+
+		List<String> ballotTexts()
+		{
+			List<String> texts = new ArrayList<>();
+			for (JRadioButton row : ballot)
+			{
+				texts.add(row.getText());
+			}
+			return texts;
+		}
+
+		List<String> tallyTexts()
+		{
+			List<String> texts = new ArrayList<>();
+			for (Component c : tally.getComponents())
+			{
+				texts.add(((JLabel) c).getText());
+			}
+			return texts;
 		}
 
 		List<String> standingTexts()
