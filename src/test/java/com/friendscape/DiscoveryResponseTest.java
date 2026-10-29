@@ -45,7 +45,7 @@ public class DiscoveryResponseTest
 	}
 
 	@Test
-	public void ordersCardsLiveThenScheduledThenFinishedThenLeft()
+	public void ordersCardsLiveThenVotingThenScheduledThenFinishedThenLeft()
 	{
 		int left = 100001;
 		int finalized = 100002;
@@ -55,18 +55,29 @@ public class DiscoveryResponseTest
 		int soon = 100006;
 		int live = 100007;
 		int held = 100008;
+		int votingLater = 100009;
+		int votingSooner = 100010;
+		int leftVoting = 100011;
 		DiscoveryResponse response = parse(
 			event(left, "live", "on_roster", ""),
 			event(finalized, "finalized", "on_roster", "\"finalizedAt\":\"2026-11-02T12:00:00.000Z\""),
 			event(removed, "live", "removed", ""),
 			event(ended, "ended", "on_roster", ""),
 			event(unscheduled, "published", "on_roster", ""),
+			event(votingLater, "published", "on_roster", vote("2026-11-06T18:00:00.000Z")),
 			event(soon, "scheduled", "on_roster", ""),
 			event(live, "live", "on_roster", ""),
+			event(leftVoting, "published", "on_roster", vote("2026-11-04T18:00:00.000Z")),
+			event(votingSooner, "published", "on_roster", vote("2026-11-05T18:00:00.000Z")),
 			event(held, "live", "held", ""));
 
-		assertEquals(List.of(live, held, unscheduled, soon, ended, finalized, left, removed),
-			numbers(response.cards(Set.of(left), Map.of(), NOW, ZoneOffset.UTC)));
+		assertEquals(List.of(live, held, votingSooner, votingLater, soon, unscheduled, ended, finalized, left, removed,
+			leftVoting), numbers(response.cards(Set.of(left, leftVoting), Map.of(), NOW, ZoneOffset.UTC)));
+	}
+
+	private static String vote(String closesAt)
+	{
+		return "\"vote\":{\"closesAt\":\"" + closesAt + "\",\"open\":false,\"candidates\":[]}";
 	}
 
 	@Test

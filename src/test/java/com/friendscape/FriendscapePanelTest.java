@@ -1,7 +1,10 @@
 package com.friendscape;
 
+import java.awt.Component;
+import java.awt.Container;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.JCheckBox;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -71,7 +74,7 @@ public class FriendscapePanelTest
 	private static EventCard card(int number, CardState state, List<String> standing)
 	{
 		return new EventCard(number, "Event " + number, state, "detail " + number, standing, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, true, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, true, null, false);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -87,7 +90,6 @@ public class FriendscapePanelTest
 
 		assertTrue(panel.disclosure.isVisible());
 		assertTrue(panel.turnOnButton.isVisible());
-		assertFalse(panel.sendingToggle.isSelected());
 	}
 
 	@Test
@@ -97,7 +99,26 @@ public class FriendscapePanelTest
 
 		assertFalse(panel.disclosure.isVisible());
 		assertFalse(panel.turnOnButton.isVisible());
-		assertTrue(panel.sendingToggle.isSelected());
+	}
+
+	@Test
+	public void hasNoSendingCheckbox()
+	{
+		panel.update(PanelState.builder().sending(true).build());
+
+		assertFalse(contains(panel, JCheckBox.class));
+	}
+
+	private static boolean contains(Container container, Class<?> type)
+	{
+		for (Component child : container.getComponents())
+		{
+			if (type.isInstance(child) || (child instanceof Container && contains((Container) child, type)))
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	@Test
@@ -108,25 +129,6 @@ public class FriendscapePanelTest
 		panel.turnOnButton.doClick();
 
 		assertEquals(List.of(true), sendingRequests);
-	}
-
-	@Test
-	public void toggleRequestsTheFlippedValue()
-	{
-		panel.update(PanelState.builder().sending(true).build());
-
-		panel.sendingToggle.doClick();
-
-		assertEquals(List.of(false), sendingRequests);
-	}
-
-	@Test
-	public void updateDoesNotEchoBackAsARequest()
-	{
-		panel.update(PanelState.builder().sending(true).build());
-		panel.update(PanelState.builder().sending(false).build());
-
-		assertTrue(sendingRequests.isEmpty());
 	}
 
 	@Test
@@ -184,7 +186,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null)));
+			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -193,7 +195,7 @@ public class FriendscapePanelTest
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null)));
+			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -210,7 +212,7 @@ public class FriendscapePanelTest
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION,
 			"On hold while Friendscape checks this RSN", List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
-			false, true, true, null)));
+			false, true, true, null, false)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.reportButton.isVisible());
@@ -235,7 +237,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null);
+			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false);
 	}
 
 	@Test
@@ -260,7 +262,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), List.of(),
-			"", large, EventCard.OPEN_BOARD, false, false, true, null)));
+			"", large, EventCard.OPEN_BOARD, false, false, true, null, false)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);
@@ -366,6 +368,43 @@ public class FriendscapePanelTest
 		assertEquals(List.of("rejoin 111111"), actions);
 	}
 
+	private static EventCard finalizedCard(CardState state)
+	{
+		return new EventCard(111111, "Event 111111", state, "Final", List.of(), List.of(), "", null,
+			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true);
+	}
+
+	@Test
+	public void aFinalizedCardHasNoLeaveAndNoMenu()
+	{
+		panel.update(discovered(finalizedCard(CardState.FINAL)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertFalse(view.leaveItem.isVisible());
+		assertFalse(view.menuButton.isVisible());
+		assertFalse(view.rejoinButton.isVisible());
+	}
+
+	@Test
+	public void aLeftFinalizedCardHasNoRejoin()
+	{
+		panel.update(discovered(finalizedCard(CardState.LEFT)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertFalse(view.rejoinButton.isVisible());
+		assertFalse(view.menuButton.isVisible());
+	}
+
+	@Test
+	public void anEndedCardKeepsLeave()
+	{
+		panel.update(discovered(card(111111, CardState.ENDED, List.of())));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.leaveItem.isVisible());
+		assertTrue(view.menuButton.isVisible());
+	}
+
 	@Test
 	public void opensTheEventPage()
 	{
@@ -396,7 +435,7 @@ public class FriendscapePanelTest
 			+ "\"choice\":" + choice + "}";
 		DiscoveryResponse.Vote vote = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Vote.class);
 		return new EventCard(333333, "Skill of the week #1", CardState.VOTING, "Voting, closes 5 Nov 18:00", List.of(),
-			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote);
+			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false);
 	}
 
 	@Test

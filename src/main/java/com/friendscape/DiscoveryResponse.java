@@ -7,6 +7,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -365,14 +366,23 @@ class DiscoveryResponse
 	}
 
 	/**
-	 * One card per Event, less Finalized ones past their week: live first, then scheduled, ended,
-	 * Finalized, and last those left or off the Roster, in the server's order within each.
-	 * {@code queued} holds this install's Submissions by Event number.
+	 * One card per Event, less Finalized ones past their week: live first, then Voting (soonest close
+	 * first), scheduled, not scheduled yet, ended, Finalized, and last those left or off the Roster,
+	 * in the server's order within each. {@code queued} holds this install's Submissions by Event number.
 	 */
 	List<EventCard> cards(Set<Integer> left, Map<Integer, EventCard.Queued> queued, Instant now, ZoneId zone)
 	{
+		Map<DiscoveredEvent, CardBucket> buckets = new IdentityHashMap<>();
+		Map<DiscoveredEvent, Instant> closes = new IdentityHashMap<>();
+		for (DiscoveredEvent event : events())
+		{
+			CardBucket bucket = CardBucket.of(event, left);
+			buckets.put(event, bucket);
+			closes.put(event, bucket == CardBucket.VOTING ? closesAt(event) : Instant.MIN);
+		}
 		List<DiscoveredEvent> ordered = new ArrayList<>(events());
-		ordered.sort(Comparator.comparingInt(event -> cardOrder(event, left)));
+		// A stable sort keeps the server's order within each bucket
+		ordered.sort(Comparator.<DiscoveredEvent, CardBucket>comparing(buckets::get).thenComparing(closes::get));
 		List<EventCard> cards = new ArrayList<>();
 		for (DiscoveredEvent event : ordered)
 		{
@@ -387,22 +397,39 @@ class DiscoveryResponse
 		return cards;
 	}
 
-	private static int cardOrder(DiscoveredEvent event, Set<Integer> left)
+	/** Where a card sorts (SPEC 10.3), in declaration order. */
+	private enum CardBucket
 	{
-		if (left.contains(event.getNumber()) || REMOVED.equals(event.getEntry()))
+		LIVE, VOTING, SCHEDULED, NOT_SCHEDULED, ENDED, FINALIZED, LEFT_OR_REMOVED;
+
+		static CardBucket of(DiscoveredEvent event, Set<Integer> left)
 		{
-			return 4;
+			if (left.contains(event.getNumber()) || REMOVED.equals(event.getEntry()))
+			{
+				return LEFT_OR_REMOVED;
+			}
+			switch (event.getPhase() == null ? "" : event.getPhase())
+			{
+				case PUBLISHED:
+					return event.getVote() != null ? VOTING : NOT_SCHEDULED;
+				case DiscoveryResponse.SCHEDULED:
+					return SCHEDULED;
+				case DiscoveryResponse.ENDED:
+					return ENDED;
+				case DiscoveryResponse.FINALIZED:
+					return FINALIZED;
+				default:
+					// Live, and any phase a newer server adds, which may well be running
+					return LIVE;
+			}
 		}
-		String phase = event.getPhase();
-		if (SCHEDULED.equals(phase) || PUBLISHED.equals(phase))
-		{
-			return 1;
-		}
-		if (ENDED.equals(phase))
-		{
-			return 2;
-		}
-		return FINALIZED.equals(phase) ? 3 : 0;
+	}
+
+	/** A Voting card's close, for ordering; an unreadable one sorts last among them. */
+	private static Instant closesAt(DiscoveredEvent event)
+	{
+		Instant closesAt = parse(event, event.getVote().getClosesAt());
+		return closesAt == null ? Instant.MAX : closesAt;
 	}
 
 	/**

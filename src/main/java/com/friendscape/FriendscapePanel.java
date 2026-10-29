@@ -11,12 +11,12 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JButton;
-import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -31,7 +31,7 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * Side panel: the header (name, sending toggle, connection status, "Playing as"), then one card per
+ * Side panel: the header (name, connection status, "Playing as", "Turn on sending"), then one card per
  * discovered Event. Every change the user makes goes through {@code setSending}, which writes the
  * config item, or through {@link CardActions}, so the panel never holds its own copy of either.
  */
@@ -65,13 +65,15 @@ class FriendscapePanel extends PluginPanel
 		void vote(int number, int candidate);
 	}
 
+	/** The space between a card's blocks, such as above its links. */
+	private static final int CARD_GAP = 6;
+
 	static final String VOTE_NOTE = "Cast in game, website changes blocked";
 
 	static final String LEAVE_CONFIRM = "Stop sending for %s from this install?\n\n"
 		+ "Your progress and Roster entry stay, and the organizer can still track you through the hiscores. "
 		+ "You can rejoin from this card at any time.";
 
-	final JCheckBox sendingToggle = new JCheckBox("Send data to Friendscape");
 	final JLabel statusDot = new JLabel(Glyphs.dot());
 	final JLabel statusText = new JLabel();
 	final JLabel playingAs = new JLabel();
@@ -117,13 +119,12 @@ class FriendscapePanel extends PluginPanel
 		disclosure.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		disclosure.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
 
-		for (JComponent c : new JComponent[]{title, sendingToggle, playingAs, disclosure, turnOnButton})
+		for (JComponent c : new JComponent[]{title, playingAs, disclosure, turnOnButton})
 		{
 			c.setAlignmentX(LEFT_ALIGNMENT);
 		}
 
 		header.add(title);
-		header.add(sendingToggle);
 		header.add(status);
 		header.add(playingAs);
 		header.add(disclosure);
@@ -140,8 +141,6 @@ class FriendscapePanel extends PluginPanel
 		body.add(cards, BorderLayout.CENTER);
 		add(body, BorderLayout.CENTER);
 
-		// ActionListener fires on user clicks only, not on setSelected, so update() never echoes back
-		sendingToggle.addActionListener(e -> setSending.accept(sendingToggle.isSelected()));
 		turnOnButton.addActionListener(e -> setSending.accept(true));
 
 		update(PanelState.builder().build());
@@ -150,8 +149,6 @@ class FriendscapePanel extends PluginPanel
 	/** Must run on the Swing thread. */
 	void update(PanelState state)
 	{
-		sendingToggle.setSelected(state.isSending());
-
 		statusDot.setForeground(state.getStatus().getColor());
 		statusText.setText(state.getStatus().getText());
 
@@ -347,8 +344,9 @@ class FriendscapePanel extends PluginPanel
 
 			JPopupMenu menu = new JPopupMenu();
 			menu.add(leaveItem);
-			leaveItem.setVisible(!card.isLeft());
-			menuButton.setVisible(!card.isLeft());
+			// A Finalized Event has nothing left to mute
+			leaveItem.setVisible(!card.isLeft() && !card.isFinalized());
+			menuButton.setVisible(leaveItem.isVisible());
 			menuButton.setToolTipText("More");
 			menuButton.addActionListener(e -> menu.show(menuButton, 0, menuButton.getHeight()));
 			leaveItem.addActionListener(e ->
@@ -358,7 +356,7 @@ class FriendscapePanel extends PluginPanel
 					actions.leave(card.getNumber());
 				}
 			});
-			rejoinButton.setVisible(card.isLeft());
+			rejoinButton.setVisible(card.isLeft() && !card.isFinalized());
 			rejoinButton.addActionListener(e -> actions.rejoin(card.getNumber()));
 			openButton.setText(card.getLink());
 			openButton.addActionListener(e ->
@@ -409,7 +407,7 @@ class FriendscapePanel extends PluginPanel
 			links.add(openButton, BorderLayout.WEST);
 			links.add(rejoinButton, BorderLayout.EAST);
 			links.setAlignmentX(LEFT_ALIGNMENT);
-			links.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
+			links.setBorder(BorderFactory.createEmptyBorder(CARD_GAP, 0, 0, 0));
 
 			add(title);
 			add(status);
@@ -420,6 +418,7 @@ class FriendscapePanel extends PluginPanel
 			add(boardToggle);
 			if (board != null)
 			{
+				board.setBorder(BorderFactory.createEmptyBorder(CARD_GAP, 0, 0, 0));
 				add(board);
 			}
 			add(links);
@@ -507,6 +506,7 @@ class FriendscapePanel extends PluginPanel
 			voteNote.setFont(FontManager.getRunescapeSmallFont());
 			voteNote.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			voteNote.setAlignmentX(LEFT_ALIGNMENT);
+			ballotPanel.add(Box.createVerticalStrut(CARD_GAP));
 			ballotPanel.add(voteButton);
 			ballotPanel.add(voteNote);
 		}

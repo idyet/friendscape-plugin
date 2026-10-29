@@ -42,6 +42,8 @@ class EventCard
 	boolean live;
 	/** The open Vote the card's picker shows; null unless Voting. */
 	DiscoveryResponse.Vote vote;
+	/** The Event is Finalized: nothing left to Leave or Rejoin (SPEC 10.3). */
+	boolean finalized;
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -83,7 +85,7 @@ class EventCard
 			&& !DiscoveryResponse.REMOVED.equals(event.getEntry());
 		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
 			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
-			state == CardState.VOTING ? event.getVote() : null);
+			state == CardState.VOTING ? event.getVote() : null, DiscoveryResponse.FINALIZED.equals(event.getPhase()));
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */

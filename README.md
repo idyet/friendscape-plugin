@@ -45,11 +45,11 @@ Each Event gets a card with its status and your Team's standing. From a card you
 
 | Setting | Default | What it does |
 |---|---|---|
-| Send data to Friendscape | Off | Sends your progress in Friendscape Events you are rostered in to the Friendscape server. Same switch as the panel's **Turn on sending**. |
-| Chat line when counted | On | Prints a chat line when a drop, collection log slot or pet counts for an Event. |
+| Send data to Friendscape | Off | Sends your progress in Friendscape Events you are rostered in to the Friendscape server. Same switch as the panel's **Turn on sending**; turn sending off here. |
+| Chat message when counted | On | Prints a chat message when a drop, collection log slot or pet counts for an Event. |
 | Notify on Team completions | On | Shows a notification when your Team completes a Tile or reaches a Tier. |
-| Notify on problems | On | Uses the RuneLite notifier when something needs your attention, such as progress on hold. |
-| Show overlay | On | Shows each live Event with its status and your rank in game. |
+| Notify on problems | On | Shows a notification when something needs your attention, such as progress on hold. |
+| Show standings overlay | On | Shows each live Event with its status and your rank in game. |
 
 ## Privacy
 

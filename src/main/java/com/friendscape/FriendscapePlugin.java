@@ -280,7 +280,7 @@ public class FriendscapePlugin extends Plugin
 			}
 		}, this::loadTileIcon);
 		panel.setOnOpen(this::discover);
-		overlay = new FriendscapeOverlay(this, () -> config.overlay() && mayTransmit());
+		overlay = new FriendscapeOverlay(this, () -> config.standingsOverlay() && mayTransmit());
 		overlayManager.add(overlay);
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");

@@ -31,8 +31,8 @@ public interface FriendscapeConfig extends Config
 
 	@ConfigItem(
 		keyName = "chatOnCounted",
-		name = "Chat line when counted",
-		description = "Print a chat line when a drop, collection log slot or pet counts for an Event",
+		name = "Chat message when counted",
+		description = "Print a chat message when a drop, collection log slot or pet counts for an Event",
 		position = 1
 	)
 	default boolean chatOnCounted()
@@ -54,7 +54,7 @@ public interface FriendscapeConfig extends Config
 	@ConfigItem(
 		keyName = "notifyOnProblems",
 		name = "Notify on problems",
-		description = "Use the RuneLite notifier when something needs your attention, such as progress on hold",
+		description = "Show a notification when something needs your attention, such as progress on hold",
 		position = 3
 	)
 	default boolean notifyOnProblems()
@@ -62,13 +62,14 @@ public interface FriendscapeConfig extends Config
 		return true;
 	}
 
+	// keyName predates the Codeword overlays; renaming it would turn the overlay back on for players who hid it
 	@ConfigItem(
 		keyName = "overlay",
-		name = "Show overlay",
-		description = "Show each Event with its status and your rank in game",
+		name = "Show standings overlay",
+		description = "Show each Live Event with its status and your rank in game",
 		position = 4
 	)
-	default boolean overlay()
+	default boolean standingsOverlay()
 	{
 		return true;
 	}
