@@ -9,11 +9,24 @@ import org.junit.Test;
 
 public class CardGroupsTest
 {
+	/** A Voting card carries a Vote not yet cast. */
 	private static EventCard card(int number, CardState state, DiscoveryResponse.Group group)
+	{
+		return state == CardState.VOTING ? voting(number, null, group) : withVote(number, state, null, group);
+	}
+
+	private static EventCard voting(int number, Integer choice, DiscoveryResponse.Group group)
+	{
+		return withVote(number, CardState.VOTING,
+			new DiscoveryResponse.Vote("2026-11-05T18:00:00Z", false, List.of(), choice), group);
+	}
+
+	private static EventCard withVote(int number, CardState state, DiscoveryResponse.Vote vote,
+		DiscoveryResponse.Group group)
 	{
 		boolean live = state == CardState.TRACKING || state == CardState.ATTENTION;
 		return new EventCard(number, "Event " + number, state, "", List.of(), List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, group);
+			EventCard.OPEN_EVENT_PAGE, false, false, live, vote, false, null, group);
 	}
 
 	private static final DiscoveryResponse.Group IRON = new DiscoveryResponse.Group(300000, "iron clan");
@@ -78,6 +91,16 @@ public class CardGroupsTest
 		EventCard scheduled = new EventCard(1, "Event 1", CardState.TRACKING, "", List.of(), List.of(), "", null,
 			EventCard.OPEN_EVENT_PAGE, false, false, false, null, false, null, IRON);
 		assertNull(CardGroups.of(List.of(scheduled, card(2, CardState.LEFT, IRON))).get(0).urgent());
+	}
+
+	@Test
+	public void aVoteAlreadyCastNeedsNoDot()
+	{
+		assertNull(CardGroups.of(List.of(voting(1, 2, IRON), card(2, CardState.ENDED, IRON))).get(0).urgent());
+		assertEquals(CardState.VOTING, CardGroups.of(List.of(voting(1, 2, IRON), voting(2, null, IRON))).get(0).urgent());
+		// Cast, but something else still runs
+		assertEquals(CardState.TRACKING, CardGroups.of(List.of(voting(1, 2, IRON), card(2, CardState.TRACKING, IRON)))
+			.get(0).urgent());
 	}
 
 	@Test

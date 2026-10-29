@@ -34,7 +34,8 @@ final class CardGroups
 
 		/**
 		 * The state a collapsed header's dot shows, so collapsing never hides something needing action:
-		 * Attention, then Voting, then Live (Tracking); null when no card is in any of them.
+		 * Attention, then Voting with a vote not yet cast, then Live (Tracking); null when no card is in
+		 * any of them.
 		 */
 		CardState urgent()
 		{
@@ -42,7 +43,9 @@ final class CardGroups
 			{
 				return CardState.ATTENTION;
 			}
-			if (cards.stream().anyMatch(card -> card.getState() == CardState.VOTING))
+			// A cast vote asks nothing more of the player
+			if (cards.stream().anyMatch(card -> card.getState() == CardState.VOTING
+				&& card.getVote() != null && card.getVote().getChoice() == null))
 			{
 				return CardState.VOTING;
 			}
