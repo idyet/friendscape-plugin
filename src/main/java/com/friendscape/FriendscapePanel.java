@@ -426,11 +426,16 @@ class FriendscapePanel extends PluginPanel
 			standing.setLayout(new BoxLayout(standing, BoxLayout.Y_AXIS));
 			standing.setOpaque(false);
 			standing.setAlignmentX(LEFT_ALIGNMENT);
-			for (String line : card.getStanding())
+			List<String> standingLines = card.getStanding();
+			for (int i = 0; i < standingLines.size(); i++)
 			{
-				JLabel label = new JLabel(line);
+				JLabel label = new JLabel(standingLines.get(i));
 				label.setFont(FontManager.getRunescapeSmallFont());
 				label.setForeground(card.isLeft() ? ColorScheme.MEDIUM_GRAY_COLOR : ColorScheme.LIGHT_GRAY_COLOR);
+				if (i == standingLines.size() - 1)
+				{
+					label.setToolTipText(card.getGainTooltip());
+				}
 				standing.add(label);
 			}
 			for (String line : card.getNotes())

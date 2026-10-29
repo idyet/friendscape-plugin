@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import lombok.Value;
 import lombok.With;
+import net.runelite.client.util.QuantityFormatter;
 
 /** One Event card as the panel shows it, and the overlay while live (SPEC 10.3): state, detail line and standing. */
 @Value
@@ -27,6 +28,8 @@ class EventCard
 	String detail;
 	/** The standing line, one per Team, then the player's own gain when on a real Team. */
 	List<String> standing;
+	/** The full figure of an XP gain line, shown short, for the last standing line's tooltip; null otherwise. */
+	String gainTooltip;
 	/** Lines that ask something of the player: uploads, and Submissions queued or pushed out. */
 	List<String> notes;
 	/** The best Team's rank for the overlay, e.g. {@code 2nd/4}; empty without a standing. */
@@ -74,6 +77,7 @@ class EventCard
 		DiscoveryResponse.Board board = event.getBoard();
 		boolean bingo = board != null;
 		List<String> standing = List.of();
+		String gainTooltip = null;
 		String rank = "";
 		if (bingo && started(event))
 		{
@@ -83,6 +87,7 @@ class EventCard
 		else if (hasStanding(event))
 		{
 			standing = standing(event);
+			gainTooltip = gainTooltip(event);
 			rank = rank(event.getStanding());
 		}
 		boolean upload = (state == CardState.ATTENTION && event.getNeedsEvidence() > 0) || queued.getPushedOut() > 0;
@@ -90,7 +95,7 @@ class EventCard
 		boolean live = DiscoveryResponse.LIVE.equals(event.getPhase()) && !left
 			&& !DiscoveryResponse.REMOVED.equals(event.getEntry());
 		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
-			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
+			gainTooltip, notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
 			state == CardState.VOTING ? event.getVote() : null, DiscoveryResponse.FINALIZED.equals(event.getPhase()),
 			live ? event.getCodeword() : null, event.getGroup());
 	}
@@ -229,20 +234,36 @@ class EventCard
 			|| DiscoveryResponse.FINALIZED.equals(phase);
 	}
 
+	private static boolean tracksXp(DiscoveryResponse.DiscoveredEvent event)
+	{
+		return !"botw".equals(event.getFormat());
+	}
+
+	/** The player's own gain gets a line when on a real Team, not only solo. */
+	private static boolean ownGainLine(DiscoveryResponse.Standing standing)
+	{
+		return standing.getTeams().stream().anyMatch(team -> !team.isSolo());
+	}
+
+	/** Only the own XP gain line shows short (SPEC 6.8), so only it has the full figure to show. */
+	private static String gainTooltip(DiscoveryResponse.DiscoveredEvent event)
+	{
+		return tracksXp(event) && ownGainLine(event.getStanding()) ? gain(event.getStanding().getGain(), "xp") : null;
+	}
+
 	private static List<String> standing(DiscoveryResponse.DiscoveredEvent event)
 	{
-		String unit = "botw".equals(event.getFormat()) ? "kc" : "xp";
+		String unit = tracksXp(event) ? "xp" : "kc";
 		List<String> lines = new ArrayList<>();
-		boolean onRealTeam = false;
 		for (DiscoveryResponse.TeamStanding team : event.getStanding().getTeams())
 		{
 			String place = ordinal(team.getRank()) + " of " + team.getOf() + ", " + gain(team.getGain(), unit);
 			lines.add(team.isSolo() ? place : team.getName() + ": " + place);
-			onRealTeam |= !team.isSolo();
 		}
-		if (onRealTeam)
+		if (ownGainLine(event.getStanding()))
 		{
-			lines.add(gain(event.getStanding().getGain(), unit) + " since start");
+			long gain = event.getStanding().getGain();
+			lines.add((tracksXp(event) ? shortGain(gain) : gain(gain, unit)) + " since start");
 		}
 		return lines;
 	}
@@ -260,6 +281,13 @@ class EventCard
 	private static String gain(long gain, String unit)
 	{
 		return String.format(Locale.ENGLISH, "+%,d %s", gain, unit);
+	}
+
+	/** RuneLite's stack form, "+13M xp"; one skill's gain fits an int, the clamp is only defensive. */
+	private static String shortGain(long gain)
+	{
+		int clamped = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, gain));
+		return (clamped < 0 ? "" : "+") + QuantityFormatter.quantityToRSDecimalStack(clamped) + " xp";
 	}
 
 	/** 1st, 2nd, 3rd, 4th, ..., 11th, 12th, 13th, 21st. */

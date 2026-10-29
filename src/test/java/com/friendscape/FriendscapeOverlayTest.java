@@ -11,7 +11,7 @@ public class FriendscapeOverlayTest
 	private static EventCard card(int number, boolean live)
 	{
 		return new EventCard(number, "Event " + number, live ? CardState.TRACKING : CardState.ENDED, "", List.of(),
-			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null);
+			null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null);
 	}
 
 	private static List<Integer> numbers(List<EventCard> cards)

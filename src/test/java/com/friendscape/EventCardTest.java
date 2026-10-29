@@ -40,7 +40,7 @@ public class EventCardTest
 		assertEquals(123456, card.getNumber());
 		assertEquals(CardState.TRACKING, card.getState());
 		assertEquals("Tracking", card.getDetail());
-		assertEquals(List.of("Team Bandos: 2nd of 4, +12,340 xp", "+3,400 xp since start"), card.getStanding());
+		assertEquals(List.of("Team Bandos: 2nd of 4, +12,340 xp", "+3400 xp since start"), card.getStanding());
 	}
 
 	@Test
@@ -85,6 +85,51 @@ public class EventCardTest
 
 		assertEquals(List.of("Zamorak: 1st of 3, +8 xp", "Bandos: 3rd of 3, +7 xp", "+7 xp since start"),
 			card.getStanding());
+	}
+
+	/** A Live Event whose player gained {@code gain} in {@code format} on Team Bandos. */
+	private static EventCard gained(String format, long gain)
+	{
+		return card("\"format\":\"" + format + "\",\"standing\":{\"gain\":" + gain + ",\"teams\":["
+			+ "{\"name\":\"Team Bandos\",\"solo\":false,\"rank\":2,\"of\":4,\"gain\":12340}]}");
+	}
+
+	@Test
+	public void showsTheOwnXpGainInRuneScapeShortFormWithTheFullFigureInTheTooltip()
+	{
+		assertEquals("+3400 xp since start", gained("sotw", 3400).getStanding().get(1));
+		assertEquals("+3,400 xp", gained("sotw", 3400).getGainTooltip());
+		assertEquals("+34K xp since start", gained("sotw", 34_000).getStanding().get(1));
+		assertEquals("+150.9K xp since start", gained("sotw", 150_987).getStanding().get(1));
+		assertEquals("+150,987 xp", gained("sotw", 150_987).getGainTooltip());
+		assertEquals("+13M xp since start", gained("sotw", 13_034_431).getStanding().get(1));
+		assertEquals("+13,034,431 xp", gained("sotw", 13_034_431).getGainTooltip());
+	}
+
+	@Test
+	public void clampsAnXpGainBeyondAnInt()
+	{
+		EventCard card = gained("sotw", 3_000_000_000L);
+
+		assertEquals("+2.1B xp since start", card.getStanding().get(1));
+		assertEquals("+3,000,000,000 xp", card.getGainTooltip());
+	}
+
+	@Test
+	public void keepsTheFullFigureForAKcGain()
+	{
+		EventCard card = gained("botw", 150_987);
+
+		assertEquals("+150,987 kc since start", card.getStanding().get(1));
+		assertNull(card.getGainTooltip());
+	}
+
+	@Test
+	public void hasNoGainTooltipWithoutAnOwnGainLine()
+	{
+		assertNull(card("\"standing\":{\"gain\":51,"
+			+ "\"teams\":[{\"name\":\"Iron Man\",\"solo\":true,\"rank\":1,\"of\":12,\"gain\":51}]}").getGainTooltip());
+		assertNull(card("\"phase\":\"scheduled\"").getGainTooltip());
 	}
 
 	@Test
