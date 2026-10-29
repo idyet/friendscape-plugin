@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.imageio.ImageIO;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.swing.SwingUtilities;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
@@ -35,6 +36,7 @@ import net.runelite.api.GameState;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
 import net.runelite.api.events.ChatMessage;
+import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
@@ -127,6 +129,10 @@ public class FriendscapePlugin extends Plugin
 
 	@Inject
 	private ChatMessageManager chatMessageManager;
+
+	@Inject
+	@Named("developerMode")
+	private boolean developerMode;
 
 	@Inject
 	private ItemManager itemManager;
@@ -456,6 +462,17 @@ public class FriendscapePlugin extends Plugin
 		if (kc != null && mayTransmit() && readingsWanted(Instant.now()))
 		{
 			sendReadings(Map.of(), Map.of(kc.getName(), kc.getCount()), Set.of());
+		}
+	}
+
+	/** {@code ::fschat} in developer mode ({@code ./gradlew run}): a normal and a problem chat line, to check their look. */
+	@Subscribe
+	public void onCommandExecuted(CommandExecuted event)
+	{
+		if (developerMode && "fschat".equalsIgnoreCase(event.getCommand()))
+		{
+			chat("Test line: 3 Events counted your Abyssal whip.", ChatColorType.NORMAL);
+			chat("Test problem: this account does not match the one on the Roster.", ChatColorType.HIGHLIGHT);
 		}
 	}
 
