@@ -2,7 +2,7 @@
 
 Tracks your progress in Friendscape Skill, Boss, or Bingo Events.
 
-If you are on the roster of a Friendscape Event, this plugin sends the progress that Event counts to the Friendscape server: XP, kill counts, drops, new collection log slots and pets. The side panel and an optional overlay show each Event's status, your Team's standing and, for bingo, a mini board.
+If you are on the roster of a Friendscape Event, this plugin sends the progress that Event counts to the Friendscape server: XP, kill counts, drops, new collection log slots and pets. The side panel shows each Event's status, your Team's standing and, for bingo, a mini board. In game, optional overlays show your standing in each live Event and each live bingo Event's Codeword.
 
 ## Getting started
 
@@ -39,7 +39,14 @@ Each Event gets a card with its status and your Team's standing. From a card you
 - **Show board / Hide board**: the bingo mini board. Click a Tile to open it on the website.
 - **Open event page to upload**: shown when a drop is waiting for a screenshot.
 - **Report to Friendscape**: shown when progress is on hold while Friendscape checks your RSN. The answer comes in chat.
+- **Vote / Change vote**: while a Series Event is voting, pick the next skill or boss. A vote cast in game cannot be changed on the website.
+- **⋯ > Hide standings / Show standings**: leave a live Event out of the standings overlay, or put it back.
+- **⋯ > Hide codeword / Show codeword**: hide or show a live bingo Event's Codeword overlay.
 - **⋯ > Leave**: stop sending for that Event from this install. Your progress and roster entry stay, and **Rejoin** on the same card turns it back on.
+
+## Codeword overlays
+
+Each live bingo Event gets its own overlay with the Event's Codeword and the current time in UTC, so any screenshot you take for a manual upload carries both. Drag each one where you like; it keeps its position.
 
 ## Configuration
 
@@ -50,6 +57,10 @@ Each Event gets a card with its status and your Team's standing. From a card you
 | Notify on Team completions | On | Shows a notification when your Team completes a Tile or reaches a Tier. |
 | Notify on problems | On | Shows a notification when something needs your attention, such as progress on hold. |
 | Show standings overlay | On | Shows each live Event with its status and your rank in game. |
+| Show codeword overlays | On | Shows each live bingo Event's Codeword in game, so screenshots for manual uploads carry it. |
+| Show timestamp on codeword overlays | On | Shows the current time in UTC next to each Codeword. |
+| Codeword color | Green | The color of the Codeword on codeword overlays. |
+| Timestamp color | White | The color of the timestamp on codeword overlays. |
 
 ## Privacy
 
