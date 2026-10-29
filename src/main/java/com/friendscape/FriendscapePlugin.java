@@ -42,7 +42,6 @@ import net.runelite.client.Notifier;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.chat.ChatColorType;
-import net.runelite.client.chat.ChatMessageBuilder;
 import net.runelite.client.chat.ChatMessageManager;
 import net.runelite.client.chat.QueuedMessage;
 import net.runelite.client.config.ConfigManager;
@@ -73,7 +72,7 @@ import okhttp3.OkHttpClient;
 
 @Slf4j
 @PluginDescriptor(
-	name = "friendscape",
+	name = "Friendscape",
 	description = "Tracks your progress in Friendscape Skill, Boss, or Bingo Events",
 	tags = {"friendscape", "clan", "bingo", "sotw", "skill of the week", "botw", "boss of the week", "event", "competition"}
 )
@@ -816,13 +815,9 @@ public class FriendscapePlugin extends Plugin
 
 	private void chat(String text, ChatColorType color)
 	{
-		String message = new ChatMessageBuilder()
-			.append(color)
-			.append("[Friendscape] " + text)
-			.build();
 		chatMessageManager.queue(QueuedMessage.builder()
 			.type(ChatMessageType.CONSOLE)
-			.runeLiteFormattedMessage(message)
+			.runeLiteFormattedMessage(ChatLine.format(text, color))
 			.build());
 	}
 
