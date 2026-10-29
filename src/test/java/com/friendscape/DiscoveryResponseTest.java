@@ -124,6 +124,21 @@ public class DiscoveryResponseTest
 	}
 
 	@Test
+	public void givesEachCardItsGroupAndNoneFromAnOlderServer()
+	{
+		DiscoveryResponse response = parse(
+			event(111111, "live", "on_roster", "\"group\":{\"number\":100000,\"name\":\"Iron clan\"}"),
+			event(222222, "live", "on_roster", "\"group\":null"),
+			event(333333, "live", "on_roster", ""));
+
+		List<EventCard> cards = response.cards(Set.of(), Map.of(), WEEK, NOW, ZoneOffset.UTC);
+
+		assertEquals(new DiscoveryResponse.Group(100000, "Iron clan"), cards.get(0).getGroup());
+		assertEquals(null, cards.get(1).getGroup());
+		assertEquals(null, cards.get(2).getGroup());
+	}
+
+	@Test
 	public void namesTheLiveEventsWhetherLeftOrRemoved()
 	{
 		DiscoveryResponse response = parse(

@@ -292,6 +292,23 @@ public class FriendscapePlugin extends Plugin
 			{
 				setStored(FriendscapeConfig.HIDDEN_CODEWORDS, config.hiddenCodewords(), number, hidden);
 			}
+
+			@Override
+			public void setByGroup(boolean byGroup)
+			{
+				configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.BY_GROUP, byGroup);
+			}
+
+			@Override
+			public void setGroupCollapsed(int key, boolean collapsed)
+			{
+				Set<Integer> keys = new HashSet<>(CardGroups.parseCollapsed(config.collapsedGroups()));
+				if (collapsed ? keys.add(key) : keys.remove(key))
+				{
+					configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.COLLAPSED_GROUPS,
+						CardGroups.formatCollapsed(keys));
+				}
+			}
 		}, this::loadTileIcon);
 		panel.setOnOpen(this::discover);
 		overlay = new FriendscapeOverlay(this, () -> config.standingsOverlay() && mayTransmit());
@@ -487,6 +504,8 @@ public class FriendscapePlugin extends Plugin
 		if (FriendscapeConfig.HIDDEN_STANDINGS.equals(event.getKey())
 			|| FriendscapeConfig.HIDDEN_CODEWORDS.equals(event.getKey())
 			|| FriendscapeConfig.CODEWORD_OVERLAYS.equals(event.getKey())
+			|| FriendscapeConfig.BY_GROUP.equals(event.getKey())
+			|| FriendscapeConfig.COLLAPSED_GROUPS.equals(event.getKey())
 			|| FriendscapeConfig.KEEP_FINALIZED_DAYS.equals(event.getKey()))
 		{
 			refreshPanel();
@@ -1040,6 +1059,8 @@ public class FriendscapePlugin extends Plugin
 			.closedBoards(StoredEventNumbers.parse(config.closedBoards()))
 			.hiddenStandings(hiddenStandings)
 			.hiddenCodewords(hiddenCodewords)
+			.byGroup(config.byGroup())
+			.collapsedGroups(CardGroups.parseCollapsed(config.collapsedGroups()))
 			.build();
 		FriendscapePanel target = panel;
 		if (target != null)

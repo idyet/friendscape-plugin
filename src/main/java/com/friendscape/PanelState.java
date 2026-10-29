@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Value;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 class PanelState
 {
 	boolean sending;
@@ -25,4 +25,9 @@ class PanelState
 	/** Events whose Codeword overlay the player hid (SPEC 10.3). */
 	@Builder.Default
 	Set<Integer> hiddenCodewords = Set.of();
+	/** Cards under a header per Group instead of one list (SPEC 10.3). */
+	boolean byGroup;
+	/** Group numbers whose header the player collapsed, {@link CardGroups#OTHER_KEY} for "Other events". */
+	@Builder.Default
+	Set<Integer> collapsedGroups = Set.of();
 }

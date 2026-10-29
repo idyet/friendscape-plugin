@@ -75,6 +75,17 @@ class DiscoveryResponse
 		 * and removed entries carry it too: the card decides whether it shows.
 		 */
 		String codeword;
+		/** The Group the Event came from; null when made outside one, and from older servers. */
+		Group group;
+	}
+
+	/** The Group an Event came from, for the panel's By Group view (SPEC 10.3). */
+	@Value
+	static class Group
+	{
+		/** The Group number: six digits, 100000 to 999999. */
+		int number;
+		String name;
 	}
 
 	/** A Series Event's Vote as the card's picker shows it (SPEC 10.3): counts only, never who voted. */

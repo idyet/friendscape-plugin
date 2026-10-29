@@ -19,6 +19,10 @@ public interface FriendscapeConfig extends Config
 	String HIDDEN_STANDINGS = "hiddenStandings";
 	/** Numbers of Live Events whose Codeword overlay the player hid (see {@link StoredEventNumbers}). */
 	String HIDDEN_CODEWORDS = "hiddenCodewords";
+	/** The panel shows cards under a header per Group (SPEC 10.3); off is one flat list. */
+	String BY_GROUP = "byGroup";
+	/** Group numbers whose panel header the player collapsed (see {@link CardGroups#parseCollapsed}). */
+	String COLLAPSED_GROUPS = "collapsedGroups";
 	/** Master switch for every Codeword overlay. */
 	String CODEWORD_OVERLAYS = "codewordOverlays";
 	String CODEWORD_TIMESTAMP = "codewordTimestamp";
@@ -184,6 +188,28 @@ public interface FriendscapeConfig extends Config
 		hidden = true
 	)
 	default String hiddenCodewords()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = BY_GROUP,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default boolean byGroup()
+	{
+		return false;
+	}
+
+	@ConfigItem(
+		keyName = COLLAPSED_GROUPS,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default String collapsedGroups()
 	{
 		return "";
 	}

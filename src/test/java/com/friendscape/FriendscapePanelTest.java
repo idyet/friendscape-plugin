@@ -82,19 +82,130 @@ public class FriendscapePanelTest
 		{
 			actions.add((hidden ? "hide codeword " : "show codeword ") + number);
 		}
+
+		@Override
+		public void setByGroup(boolean byGroup)
+		{
+			actions.add(byGroup ? "by group" : "flat");
+		}
+
+		@Override
+		public void setGroupCollapsed(int key, boolean collapsed)
+		{
+			actions.add((collapsed ? "collapse " : "expand ") + key);
+		}
 	}, MiniBoardView.TileIcons.NONE);
 
 	private static EventCard card(int number, CardState state, List<String> standing)
 	{
 		boolean live = state == CardState.TRACKING || state == CardState.ATTENTION;
 		return new EventCard(number, "Event " + number, state, "detail " + number, standing, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null);
 	}
 
 	private static PanelState discovered(EventCard... cards)
 	{
 		return PanelState.builder().sending(true).rsn("Iron Man").status(ConnectionStatus.CONNECTED)
 			.cards(List.of(cards)).build();
+	}
+
+	private static final DiscoveryResponse.Group IRON = new DiscoveryResponse.Group(300000, "Iron clan");
+	private static final DiscoveryResponse.Group BANDOS = new DiscoveryResponse.Group(200000, "Bandos boys");
+
+	private static EventCard grouped(int number, CardState state, DiscoveryResponse.Group group)
+	{
+		return card(number, state, List.of()).withGroup(group);
+	}
+
+	private static PanelState byGroup(Set<Integer> collapsed, EventCard... cards)
+	{
+		return discovered(cards).toBuilder().byGroup(true).collapsedGroups(collapsed).build();
+	}
+
+	/** The cards list as shown: a header's name, or a card's Event number. */
+	private List<String> shownOrder()
+	{
+		List<String> shown = new ArrayList<>();
+		for (Component c : panel.cards.getComponents())
+		{
+			if (c instanceof FriendscapePanel.GroupHeader)
+			{
+				shown.add(((FriendscapePanel.GroupHeader) c).name.getText());
+			}
+			else if (c instanceof FriendscapePanel.CardView && c.isVisible())
+			{
+				shown.add(((FriendscapePanel.CardView) c).name.getText());
+			}
+		}
+		return shown;
+	}
+
+	@Test
+	public void theGroupToggleSwitchesBetweenFlatAndByGroup()
+	{
+		panel.update(discovered(card(111111, CardState.TRACKING, List.of())));
+		assertTrue(panel.groupToggle.isVisible());
+		assertEquals("Show by Group", panel.groupToggle.getToolTipText());
+		panel.groupToggle.doClick();
+
+		panel.update(byGroup(Set.of(), card(111111, CardState.TRACKING, List.of())));
+		assertEquals("Show as one list", panel.groupToggle.getToolTipText());
+		panel.groupToggle.doClick();
+
+		assertEquals(List.of("by group", "flat"), actions);
+	}
+
+	@Test
+	public void flatShowsNoGroupHeaders()
+	{
+		panel.update(discovered(grouped(111111, CardState.TRACKING, IRON), card(222222, CardState.ENDED, List.of())));
+
+		assertEquals(List.of("Event 111111", "Event 222222"), shownOrder());
+	}
+
+	@Test
+	public void byGroupShowsAHeaderPerGroupWithItsCardsBeneathAndOtherEventsLast()
+	{
+		panel.update(byGroup(Set.of(), card(111111, CardState.TRACKING, List.of()),
+			grouped(222222, CardState.TRACKING, IRON), grouped(333333, CardState.TRACKING, BANDOS),
+			grouped(444444, CardState.ENDED, IRON)));
+
+		assertEquals(List.of("Bandos boys", "Event 333333", "Iron clan", "Event 222222", "Event 444444",
+			CardGroups.OTHER_EVENTS, "Event 111111"), shownOrder());
+		// Expanded: no count or dot, which would only repeat the cards beneath
+		FriendscapePanel.GroupHeader header = panel.groupHeaders.get(0);
+		assertFalse(header.count.isVisible());
+		assertFalse(header.dot.isVisible());
+	}
+
+	@Test
+	public void aCollapsedHeaderHidesItsCardsAndShowsTheirCountAndMostUrgentState()
+	{
+		panel.update(byGroup(Set.of(IRON.getNumber(), CardGroups.OTHER_KEY), card(111111, CardState.ENDED, List.of()),
+			grouped(222222, CardState.TRACKING, IRON), grouped(333333, CardState.TRACKING, BANDOS),
+			grouped(444444, CardState.ATTENTION, IRON)));
+
+		assertEquals(List.of("Bandos boys", "Event 333333", "Iron clan", CardGroups.OTHER_EVENTS), shownOrder());
+		FriendscapePanel.GroupHeader iron = panel.groupHeaders.get(1);
+		assertEquals("2", iron.count.getText());
+		assertTrue(iron.dot.isVisible());
+		assertEquals(CardState.ATTENTION.getColor(), iron.dot.getForeground());
+		// Nothing there needs action: no dot
+		FriendscapePanel.GroupHeader other = panel.groupHeaders.get(2);
+		assertEquals("1", other.count.getText());
+		assertFalse(other.dot.isVisible());
+	}
+
+	@Test
+	public void clickingAHeaderAsksToCollapseOrExpandIt()
+	{
+		panel.update(byGroup(Set.of(CardGroups.OTHER_KEY), card(111111, CardState.ENDED, List.of()),
+			grouped(222222, CardState.TRACKING, IRON)));
+
+		panel.groupHeaders.get(0).doClick();
+		panel.groupHeaders.get(1).doClick();
+
+		assertEquals(List.of("collapse 300000", "expand 0"), actions);
 	}
 
 	@Test
@@ -200,7 +311,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null)));
+			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -209,7 +320,7 @@ public class FriendscapePanelTest
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null)));
+			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -226,7 +337,7 @@ public class FriendscapePanelTest
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION,
 			"On hold while Friendscape checks this RSN", List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
-			false, true, true, null, false, null)));
+			false, true, true, null, false, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.reportButton.isVisible());
@@ -251,7 +362,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null);
+			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null);
 	}
 
 	@Test
@@ -276,7 +387,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), List.of(),
-			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null)));
+			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);
@@ -385,7 +496,7 @@ public class FriendscapePanelTest
 	private static EventCard finalizedCard(CardState state)
 	{
 		return new EventCard(111111, "Event 111111", state, "Final", List.of(), List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null, null);
 	}
 
 	@Test
@@ -423,7 +534,7 @@ public class FriendscapePanelTest
 	{
 		return new EventCard(card.getNumber(), card.getName(), card.getState(), card.getDetail(), card.getStanding(),
 			card.getNotes(), card.getRank(), card.getBoard(), card.getLink(), card.isUpload(), card.isReport(),
-			card.isLive(), card.getVote(), card.isFinalized(), codeword);
+			card.isLive(), card.getVote(), card.isFinalized(), codeword, card.getGroup());
 	}
 
 	@Test
@@ -514,7 +625,7 @@ public class FriendscapePanelTest
 			+ "\"choice\":" + choice + "}";
 		DiscoveryResponse.Vote vote = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Vote.class);
 		return new EventCard(333333, "Skill of the week #1", CardState.VOTING, "Voting, closes 5 Nov 18:00", List.of(),
-			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null);
+			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null, null);
 	}
 
 	@Test

@@ -3,6 +3,7 @@ package com.friendscape;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
 import java.awt.Font;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButton;
+import javax.swing.JToggleButton;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
@@ -69,6 +71,12 @@ class FriendscapePanel extends PluginPanel
 
 		/** Hides a Live Event's Codeword overlay, or brings it back (SPEC 10.3). */
 		void setCodewordHidden(int number, boolean hidden);
+
+		/** Switches the cards between one flat list and a header per Group (SPEC 10.3). */
+		void setByGroup(boolean byGroup);
+
+		/** Collapses a Group header or expands it, by Group number or {@link CardGroups#OTHER_KEY}. */
+		void setGroupCollapsed(int key, boolean collapsed);
 	}
 
 	/** The space between a card's blocks, such as above its links. */
@@ -86,11 +94,15 @@ class FriendscapePanel extends PluginPanel
 	final JLabel disclosure = new JLabel("<html>" + FriendscapeConfig.WARNING + "</html>");
 	final JButton turnOnButton = new JButton("Turn on sending");
 	final JLabel emptyState = new JLabel();
+	final JToggleButton groupToggle = new JToggleButton(Glyphs.groups());
 	final List<CardView> cardViews = new ArrayList<>();
+	/** By Group only: one per section, in panel order. */
+	final List<GroupHeader> groupHeaders = new ArrayList<>();
 	/** Asks before a Leave, given the Event name; replaced in tests. */
 	Predicate<String> confirmLeave = this::askLeave;
 
-	private final JPanel cards = new JPanel();
+	/** The cards list, headers included. */
+	final JPanel cards = new JPanel();
 	private final CardActions actions;
 	private final MiniBoardView.TileIcons icons;
 	/** The Team each mini board shows, by Event number; kept across updates, not across restarts. */
@@ -99,6 +111,8 @@ class FriendscapePanel extends PluginPanel
 	private final Map<Integer, Integer> picks = new HashMap<>();
 	/** Runs each time the panel is opened. */
 	private Runnable onOpen = () -> { };
+	/** What the last update showed, so the toggle asks for the other view. */
+	private boolean byGroup;
 
 	FriendscapePanel(Consumer<Boolean> setSending, CardActions actions, MiniBoardView.TileIcons icons)
 	{
@@ -113,6 +127,11 @@ class FriendscapePanel extends PluginPanel
 		JLabel title = new JLabel("friendscape");
 		title.setFont(FontManager.getRunescapeBoldFont());
 		title.setForeground(ColorScheme.BRAND_ORANGE);
+		groupToggle.setFocusable(false);
+		groupToggle.addActionListener(e -> actions.setByGroup(!byGroup));
+		JPanel titleRow = new JPanel(new BorderLayout(5, 0));
+		titleRow.add(title, BorderLayout.CENTER);
+		titleRow.add(groupToggle, BorderLayout.EAST);
 
 		JPanel status = new JPanel(new BorderLayout(5, 0));
 		status.add(statusDot, BorderLayout.WEST);
@@ -125,12 +144,12 @@ class FriendscapePanel extends PluginPanel
 		disclosure.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		disclosure.setBorder(BorderFactory.createEmptyBorder(8, 0, 8, 0));
 
-		for (JComponent c : new JComponent[]{title, playingAs, disclosure, turnOnButton})
+		for (JComponent c : new JComponent[]{titleRow, playingAs, disclosure, turnOnButton})
 		{
 			c.setAlignmentX(LEFT_ALIGNMENT);
 		}
 
-		header.add(title);
+		header.add(titleRow);
 		header.add(status);
 		header.add(playingAs);
 		header.add(disclosure);
@@ -168,18 +187,42 @@ class FriendscapePanel extends PluginPanel
 		List<EventCard> shown = state.isSending() && state.getCards() != null ? state.getCards() : List.of();
 		emptyState.setVisible(state.isSending() && state.getCards() != null && shown.isEmpty());
 		emptyState.setText("<html>No Events yet. Ask your organizer to add " + state.getRsn() + ".</html>");
+		byGroup = state.isByGroup();
+		groupToggle.setVisible(!shown.isEmpty());
+		groupToggle.setSelected(byGroup);
+		groupToggle.setToolTipText(byGroup ? "Show as one list" : "Show by Group");
 		cards.removeAll();
 		cardViews.clear();
-		for (EventCard card : shown)
+		groupHeaders.clear();
+		if (byGroup)
 		{
-			CardView view = new CardView(card, !state.getClosedBoards().contains(card.getNumber()),
-				state.getHiddenStandings().contains(card.getNumber()), state.getHiddenCodewords().contains(card.getNumber()));
-			cardViews.add(view);
-			cards.add(view);
+			for (CardGroups.Section section : CardGroups.of(shown))
+			{
+				boolean collapsed = state.getCollapsedGroups().contains(section.getKey());
+				GroupHeader header = new GroupHeader(section, collapsed);
+				groupHeaders.add(header);
+				cards.add(header);
+				if (!collapsed)
+				{
+					section.getCards().forEach(card -> addCard(card, state));
+				}
+			}
+		}
+		else
+		{
+			shown.forEach(card -> addCard(card, state));
 		}
 
 		revalidate();
 		repaint();
+	}
+
+	private void addCard(EventCard card, PanelState state)
+	{
+		CardView view = new CardView(card, !state.getClosedBoards().contains(card.getNumber()),
+			state.getHiddenStandings().contains(card.getNumber()), state.getHiddenCodewords().contains(card.getNumber()));
+		cardViews.add(view);
+		cards.add(view);
 	}
 
 	void setOnOpen(Runnable onOpen)
@@ -277,6 +320,53 @@ class FriendscapePanel extends PluginPanel
 	{
 		return JOptionPane.showConfirmDialog(this, String.format(LEAVE_CONFIRM, eventName), "Leave " + eventName,
 			JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE) == JOptionPane.OK_OPTION;
+	}
+
+	/**
+	 * A By Group header: the Group name, and while collapsed its card count and a dot for its most
+	 * urgent card (SPEC 10.3). Clicking collapses or expands it.
+	 */
+	class GroupHeader extends JButton
+	{
+		final JLabel name = new JLabel();
+		final JLabel count = new JLabel();
+		final JLabel dot = new JLabel(Glyphs.dot());
+
+		GroupHeader(CardGroups.Section section, boolean collapsed)
+		{
+			setLayout(new BorderLayout(5, 0));
+			setBorder(BorderFactory.createEmptyBorder(4, 2, 6, 2));
+			setContentAreaFilled(false);
+			setFocusable(false);
+			setAlignmentX(LEFT_ALIGNMENT);
+
+			JLabel arrow = new JLabel(Glyphs.chevron(!collapsed));
+			arrow.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			name.setText(section.getName());
+			name.setFont(FontManager.getRunescapeBoldFont());
+			name.setForeground(ColorScheme.TEXT_COLOR);
+			count.setText(String.valueOf(section.getCards().size()));
+			count.setFont(FontManager.getRunescapeSmallFont());
+			count.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			count.setVisible(collapsed);
+			CardState urgent = section.urgent();
+			dot.setVisible(collapsed && urgent != null);
+			if (urgent != null)
+			{
+				dot.setForeground(urgent.getColor());
+			}
+
+			JPanel summary = new JPanel(new BorderLayout(5, 0));
+			summary.setOpaque(false);
+			summary.add(count, BorderLayout.WEST);
+			summary.add(dot, BorderLayout.EAST);
+			add(arrow, BorderLayout.WEST);
+			add(name, BorderLayout.CENTER);
+			add(summary, BorderLayout.EAST);
+			// Full width in the cards' BoxLayout, at its own height
+			setMaximumSize(new Dimension(Integer.MAX_VALUE, getPreferredSize().height));
+			addActionListener(e -> actions.setGroupCollapsed(section.getKey(), !collapsed));
+		}
 	}
 
 	/** One Event card: name, state dot and detail, standing lines, then its links. */

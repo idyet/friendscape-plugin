@@ -23,7 +23,7 @@ public class CodewordOverlaysTest
 	private static EventCard card(int number, boolean live, String codeword)
 	{
 		return new EventCard(number, "Event " + number, live ? CardState.TRACKING : CardState.ENDED, "", List.of(),
-			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, codeword);
+			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, codeword, null);
 	}
 
 	private static Map<Integer, String> codewords(Object... pairs)

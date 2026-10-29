@@ -35,6 +35,35 @@ final class Glyphs
 		});
 	}
 
+	/** Two headers each over an indented line: the panel's By Group toggle. */
+	static Icon groups()
+	{
+		return new Painted(12, 12, (g, x, y) ->
+		{
+			for (int i = 0; i < 2; i++)
+			{
+				g.fillRect(x, y + i * 7, 12, 2);
+				g.fillRect(x + 4, y + i * 7 + 3, 8, 2);
+			}
+		});
+	}
+
+	/** A small triangle pointing down when open, right when collapsed: a Group header's state. */
+	static Icon chevron(boolean open)
+	{
+		return new Painted(8, 8, (g, x, y) ->
+		{
+			if (open)
+			{
+				g.fillPolygon(new int[]{x, x + 8, x + 4}, new int[]{y + 2, y + 2, y + 6}, 3);
+			}
+			else
+			{
+				g.fillPolygon(new int[]{x + 2, x + 6, x + 2}, new int[]{y, y + 4, y + 8}, 3);
+			}
+		});
+	}
+
 	private interface Painter
 	{
 		void paint(Graphics2D g, int x, int y);

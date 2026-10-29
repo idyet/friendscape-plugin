@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import lombok.Value;
+import lombok.With;
 
 /** One Event card as the panel shows it, and the overlay while live (SPEC 10.3): state, detail line and standing. */
 @Value
@@ -46,6 +47,9 @@ class EventCard
 	boolean finalized;
 	/** The Codeword its overlay shows while live; null when there is none to show (SPEC 10.3). */
 	String codeword;
+	/** The Group the Event came from; null when none, or from an older server. */
+	@With
+	DiscoveryResponse.Group group;
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -88,7 +92,7 @@ class EventCard
 		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
 			notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
 			state == CardState.VOTING ? event.getVote() : null, DiscoveryResponse.FINALIZED.equals(event.getPhase()),
-			live ? event.getCodeword() : null);
+			live ? event.getCodeword() : null, event.getGroup());
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */
