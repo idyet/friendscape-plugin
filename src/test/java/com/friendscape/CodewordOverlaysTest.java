@@ -16,7 +16,9 @@ public class CodewordOverlaysTest
 	private final List<String> removed = new ArrayList<>();
 	private final CodewordOverlays overlays = new CodewordOverlays(
 		overlay -> added.add(overlay.getName()), overlay -> removed.add(overlay.getName()),
-		number -> new CodewordOverlay(null, number, () -> true, () -> true));
+		number -> new CodewordOverlay(null, number, () -> true, new FriendscapeConfig()
+		{
+		}));
 
 	private static EventCard card(int number, boolean live, String codeword)
 	{

@@ -291,7 +291,7 @@ public class FriendscapePlugin extends Plugin
 		overlay = new FriendscapeOverlay(this, () -> config.standingsOverlay() && mayTransmit());
 		overlayManager.add(overlay);
 		codewordOverlays = new CodewordOverlays(overlayManager::add, overlayManager::remove,
-			number -> new CodewordOverlay(this, number, this::mayTransmit, config::codewordTimestamp));
+			number -> new CodewordOverlay(this, number, this::mayTransmit, config));
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()

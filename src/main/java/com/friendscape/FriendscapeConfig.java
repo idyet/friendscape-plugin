@@ -1,5 +1,6 @@
 package com.friendscape;
 
+import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -20,6 +21,8 @@ public interface FriendscapeConfig extends Config
 	/** Master switch for every Codeword overlay. */
 	String CODEWORD_OVERLAYS = "codewordOverlays";
 	String CODEWORD_TIMESTAMP = "codewordTimestamp";
+	String CODEWORD_COLOR = "codewordColor";
+	String TIMESTAMP_COLOR = "timestampColor";
 	String WARNING = "This plugin submits your username, account hash, drops, kill counts, XP and screenshots"
 		+ " to a 3rd-party server (friendscape) not controlled or verified by the RuneLite Developers.";
 
@@ -101,6 +104,28 @@ public interface FriendscapeConfig extends Config
 	default boolean codewordTimestamp()
 	{
 		return true;
+	}
+
+	@ConfigItem(
+		keyName = CODEWORD_COLOR,
+		name = "Codeword color",
+		description = "The color of the Codeword on codeword overlays",
+		position = 7
+	)
+	default Color codewordColor()
+	{
+		return new Color(0x00FF6A);
+	}
+
+	@ConfigItem(
+		keyName = TIMESTAMP_COLOR,
+		name = "Timestamp color",
+		description = "The color of the timestamp on codeword overlays",
+		position = 8
+	)
+	default Color timestampColor()
+	{
+		return Color.WHITE;
 	}
 
 	@ConfigItem(

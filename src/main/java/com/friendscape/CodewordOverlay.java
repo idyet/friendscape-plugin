@@ -28,15 +28,15 @@ class CodewordOverlay extends OverlayPanel
 
 	private final int number;
 	private final BooleanSupplier shown;
-	private final BooleanSupplier timestamped;
+	private final FriendscapeConfig config;
 	private volatile String codeword = "";
 
-	CodewordOverlay(Plugin plugin, int number, BooleanSupplier shown, BooleanSupplier timestamped)
+	CodewordOverlay(Plugin plugin, int number, BooleanSupplier shown, FriendscapeConfig config)
 	{
 		super(plugin);
 		this.number = number;
 		this.shown = shown;
-		this.timestamped = timestamped;
+		this.config = config;
 		setPosition(OverlayPosition.TOP_LEFT);
 	}
 
@@ -70,7 +70,7 @@ class CodewordOverlay extends OverlayPanel
 			return null;
 		}
 		String current = codeword;
-		String time = timestamped.getAsBoolean() ? timestamp(Instant.now()) : "";
+		String time = config.codewordTimestamp() ? timestamp(Instant.now()) : "";
 		// Wide enough for one line: the default panel width would wrap a long Codeword
 		FontMetrics metrics = graphics.getFontMetrics();
 		int width = metrics.stringWidth(current) + (time.isEmpty() ? 0 : GAP + metrics.stringWidth(time))
@@ -78,7 +78,9 @@ class CodewordOverlay extends OverlayPanel
 		panelComponent.setPreferredSize(new Dimension(width, 0));
 		panelComponent.getChildren().add(LineComponent.builder()
 			.left(current)
+			.leftColor(config.codewordColor())
 			.right(time)
+			.rightColor(config.timestampColor())
 			.build());
 		return super.render(graphics);
 	}
