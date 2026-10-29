@@ -33,4 +33,12 @@ public class StoredEventNumbersTest
 		assertEquals(false, StoredEventNumbers.isEventNumber(1000000));
 		assertEquals(false, StoredEventNumbers.isEventNumber(null));
 	}
+
+	@Test
+	public void prunesToTheKeptNumbers()
+	{
+		assertEquals("123456", StoredEventNumbers.prune("123456,654321", Set.of(123456, 111111)));
+		assertEquals("", StoredEventNumbers.prune("123456", Set.of()));
+		assertEquals("", StoredEventNumbers.prune("", Set.of(123456)));
+	}
 }

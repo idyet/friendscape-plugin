@@ -55,6 +55,19 @@ public class EventCardTest
 	}
 
 	@Test
+	public void carriesTheCodewordOnlyWhileLiveAndStillSending()
+	{
+		String codeword = "\"codeword\":\"Mithril\"";
+		assertEquals("Mithril", card(codeword).getCodeword());
+		assertEquals("Mithril", card(codeword + ",\"entry\":\"held\"").getCodeword());
+		assertNull(card("").getCodeword());
+		assertNull(card("\"codeword\":null").getCodeword());
+		assertNull(card(codeword + ",\"phase\":\"ended\"").getCodeword());
+		assertNull(card(codeword + ",\"entry\":\"removed\"").getCodeword());
+		assertNull(EventCard.of(event(codeword), true, EventCard.Queued.NONE, ZoneOffset.UTC).getCodeword());
+	}
+
+	@Test
 	public void showsASoloStandingAsRankAndGainInKcForABossOfTheWeek()
 	{
 		EventCard card = card("\"format\":\"botw\",\"standing\":{\"gain\":51,"

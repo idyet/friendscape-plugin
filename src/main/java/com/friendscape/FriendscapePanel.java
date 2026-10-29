@@ -63,6 +63,12 @@ class FriendscapePanel extends PluginPanel
 
 		/** Votes from a Voting card for a Candidate, by its Ballot place (SPEC 4.9). */
 		void vote(int number, int candidate);
+
+		/** Leaves a live Event out of the standings overlay, or brings it back (SPEC 10.3). */
+		void setStandingsHidden(int number, boolean hidden);
+
+		/** Hides a live Event's Codeword overlay, or brings it back (SPEC 10.3). */
+		void setCodewordHidden(int number, boolean hidden);
 	}
 
 	/** The space between a card's blocks, such as above its links. */
@@ -166,7 +172,8 @@ class FriendscapePanel extends PluginPanel
 		cardViews.clear();
 		for (EventCard card : shown)
 		{
-			CardView view = new CardView(card, !state.getClosedBoards().contains(card.getNumber()));
+			CardView view = new CardView(card, !state.getClosedBoards().contains(card.getNumber()),
+				state.getHiddenStandings().contains(card.getNumber()), state.getHiddenCodewords().contains(card.getNumber()));
 			cardViews.add(view);
 			cards.add(view);
 		}
@@ -287,6 +294,8 @@ class FriendscapePanel extends PluginPanel
 		final JButton rejoinButton = new JButton("Rejoin");
 		final JButton menuButton = new JButton(Glyphs.more());
 		final JMenuItem leaveItem = new JMenuItem("Leave");
+		final JMenuItem standingsItem = new JMenuItem();
+		final JMenuItem codewordItem = new JMenuItem();
 		/** Candidate list mode: one radio per Candidate; empty otherwise. */
 		final List<JRadioButton> ballot = new ArrayList<>();
 		/** Any mode: the Any tally lines above the picker. */
@@ -296,7 +305,7 @@ class FriendscapePanel extends PluginPanel
 		final JButton voteButton = new JButton("Vote");
 		final JLabel voteNote = new JLabel(VOTE_NOTE);
 
-		CardView(EventCard card, boolean boardOpen)
+		CardView(EventCard card, boolean boardOpen, boolean standingsHidden, boolean codewordHidden)
 		{
 			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 			setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -343,10 +352,19 @@ class FriendscapePanel extends PluginPanel
 			}
 
 			JPopupMenu menu = new JPopupMenu();
+			menu.add(standingsItem);
+			menu.add(codewordItem);
 			menu.add(leaveItem);
+			// Overlay choices only mean something while the Event is in the overlays
+			standingsItem.setVisible(card.isLive());
+			standingsItem.setText(standingsHidden ? "Show standings" : "Hide standings");
+			standingsItem.addActionListener(e -> actions.setStandingsHidden(card.getNumber(), !standingsHidden));
+			codewordItem.setVisible(card.getCodeword() != null);
+			codewordItem.setText(codewordHidden ? "Show codeword" : "Hide codeword");
+			codewordItem.addActionListener(e -> actions.setCodewordHidden(card.getNumber(), !codewordHidden));
 			// A Finalized Event has nothing left to mute
 			leaveItem.setVisible(!card.isLeft() && !card.isFinalized());
-			menuButton.setVisible(leaveItem.isVisible());
+			menuButton.setVisible(standingsItem.isVisible() || codewordItem.isVisible() || leaveItem.isVisible());
 			menuButton.setToolTipText("More");
 			menuButton.addActionListener(e -> menu.show(menuButton, 0, menuButton.getHeight()));
 			leaveItem.addActionListener(e ->

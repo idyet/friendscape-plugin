@@ -72,6 +72,11 @@ class DiscoveryResponse
 		/** A Series Event's Vote while votes are taken; null otherwise, and from older servers. */
 		@With
 		Vote vote;
+		/**
+		 * The Codeword while the Event is Live with it on; null otherwise, and from older servers. Held
+		 * and removed entries carry it too: the card decides who shows it.
+		 */
+		String codeword;
 	}
 
 	/** A Series Event's Vote as the card's picker shows it (SPEC 10.3): counts only, never who voted. */
@@ -457,6 +462,23 @@ class DiscoveryResponse
 			return true;
 		}
 		return false;
+	}
+
+	/**
+	 * The Events in the Live phase, left or off the Roster too: those whose per-Event overlay
+	 * choices are kept (SPEC 10.3), so a Leave and Rejoin keeps them.
+	 */
+	Set<Integer> liveNumbers()
+	{
+		Set<Integer> live = new TreeSet<>();
+		for (DiscoveredEvent event : events())
+		{
+			if (LIVE.equals(event.getPhase()))
+			{
+				live.add(event.getNumber());
+			}
+		}
+		return live;
 	}
 
 	/** The discovered Events the player left: what a Reading names as muted. Sorted, for the wire. */

@@ -37,6 +37,14 @@ final class StoredEventNumbers
 			.collect(Collectors.toUnmodifiableSet());
 	}
 
+	/** The stored set less every number not in {@code kept}, formatted. */
+	static String prune(String stored, Set<Integer> kept)
+	{
+		Set<Integer> pruned = new TreeSet<>(parse(stored));
+		pruned.retainAll(kept);
+		return format(pruned);
+	}
+
 	static String format(Set<Integer> numbers)
 	{
 		return new TreeSet<>(numbers).stream().map(String::valueOf).collect(Collectors.joining(","));

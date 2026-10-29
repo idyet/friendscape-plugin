@@ -148,6 +148,7 @@ public class FriendscapePlugin extends Plugin
 	private FriendscapeApi api;
 	private FriendscapePanel panel;
 	private FriendscapeOverlay overlay;
+	private CodewordOverlays codewordOverlays;
 	private NavigationButton navButton;
 
 	// Written on the client thread, read by the API gate on OkHttp threads and by the scheduler.
@@ -271,17 +272,26 @@ public class FriendscapePlugin extends Plugin
 			@Override
 			public void setBoardOpen(int number, boolean open)
 			{
-				Set<Integer> closed = new HashSet<>(StoredEventNumbers.parse(config.closedBoards()));
-				if (open ? closed.remove(number) : closed.add(number))
-				{
-					configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.CLOSED_BOARDS,
-						StoredEventNumbers.format(closed));
-				}
+				setStored(FriendscapeConfig.CLOSED_BOARDS, config.closedBoards(), number, !open);
+			}
+
+			@Override
+			public void setStandingsHidden(int number, boolean hidden)
+			{
+				setStored(FriendscapeConfig.HIDDEN_STANDINGS, config.hiddenStandings(), number, hidden);
+			}
+
+			@Override
+			public void setCodewordHidden(int number, boolean hidden)
+			{
+				setStored(FriendscapeConfig.HIDDEN_CODEWORDS, config.hiddenCodewords(), number, hidden);
 			}
 		}, this::loadTileIcon);
 		panel.setOnOpen(this::discover);
 		overlay = new FriendscapeOverlay(this, () -> config.standingsOverlay() && mayTransmit());
 		overlayManager.add(overlay);
+		codewordOverlays = new CodewordOverlays(overlayManager::add, overlayManager::remove,
+			number -> new CodewordOverlay(this, number, this::mayTransmit, config::codewordTimestamp));
 
 		BufferedImage icon = ImageUtil.loadImageResource(getClass(), "icon.png");
 		navButton = NavigationButton.builder()
@@ -336,6 +346,7 @@ public class FriendscapePlugin extends Plugin
 		cancelAll();
 		clientToolbar.removeNavigation(navButton);
 		overlayManager.remove(overlay);
+		codewordOverlays.close();
 		loggedIn = false;
 		worldTracked = false;
 		rsn = null;
@@ -454,6 +465,13 @@ public class FriendscapePlugin extends Plugin
 	{
 		if (!FriendscapeConfig.GROUP.equals(event.getGroup()))
 		{
+			return;
+		}
+		if (FriendscapeConfig.HIDDEN_STANDINGS.equals(event.getKey())
+			|| FriendscapeConfig.HIDDEN_CODEWORDS.equals(event.getKey())
+			|| FriendscapeConfig.CODEWORD_OVERLAYS.equals(event.getKey()))
+		{
+			refreshPanel();
 			return;
 		}
 		if (FriendscapeConfig.LEFT_EVENTS.equals(event.getKey()))
@@ -770,6 +788,10 @@ public class FriendscapePlugin extends Plugin
 			{
 				celebrate(completed);
 			}
+			// Only an answer prunes: a failed discovery must not lose the player's choices
+			Set<Integer> live = response.liveNumbers();
+			pruneStored(FriendscapeConfig.HIDDEN_STANDINGS, config.hiddenStandings(), live);
+			pruneStored(FriendscapeConfig.HIDDEN_CODEWORDS, config.hiddenCodewords(), live);
 			refreshPanel();
 		}, reachable ->
 		{
@@ -880,6 +902,26 @@ public class FriendscapePlugin extends Plugin
 		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, StoredEventNumbers.format(left));
 	}
 
+	/** Adds an Event number to a stored set, or takes it out; writes only on a change. */
+	private void setStored(String key, String stored, int number, boolean in)
+	{
+		Set<Integer> numbers = new HashSet<>(StoredEventNumbers.parse(stored));
+		if (in ? numbers.add(number) : numbers.remove(number))
+		{
+			configManager.setConfiguration(FriendscapeConfig.GROUP, key, StoredEventNumbers.format(numbers));
+		}
+	}
+
+	/** Drops from a stored set every Event number not in {@code kept}; writes only on a change. */
+	private void pruneStored(String key, String stored, Set<Integer> kept)
+	{
+		String pruned = StoredEventNumbers.prune(stored, kept);
+		if (!pruned.equals(StoredEventNumbers.format(StoredEventNumbers.parse(stored))))
+		{
+			configManager.setConfiguration(FriendscapeConfig.GROUP, key, pruned);
+		}
+	}
+
 	/** Cancels every in-flight call; queued Submissions they carried are due again. */
 	private void cancelAll()
 	{
@@ -962,10 +1004,18 @@ public class FriendscapePlugin extends Plugin
 		SubmissionSender queued = sender;
 		List<EventCard> cards = found == null ? null : found.cards(left(),
 			queued == null ? Map.of() : queued.queued(accountHash), Instant.now(), ZoneId.systemDefault());
+		List<EventCard> overlaid = cards == null ? List.of() : cards;
+		Set<Integer> hiddenStandings = StoredEventNumbers.parse(config.hiddenStandings());
+		Set<Integer> hiddenCodewords = StoredEventNumbers.parse(config.hiddenCodewords());
 		FriendscapeOverlay shownOverlay = overlay;
 		if (shownOverlay != null)
 		{
-			shownOverlay.setCards(cards == null ? List.of() : cards);
+			shownOverlay.setCards(overlaid, hiddenStandings);
+		}
+		CodewordOverlays shownCodewords = codewordOverlays;
+		if (shownCodewords != null)
+		{
+			shownCodewords.show(config.codewordOverlays() ? CodewordOverlays.wanted(overlaid, hiddenCodewords) : Map.of());
 		}
 		PanelState state = PanelState.builder()
 			.sending(config.sendData())
@@ -973,6 +1023,8 @@ public class FriendscapePlugin extends Plugin
 			.status(status())
 			.cards(cards)
 			.closedBoards(StoredEventNumbers.parse(config.closedBoards()))
+			.hiddenStandings(hiddenStandings)
+			.hiddenCodewords(hiddenCodewords)
 			.build();
 		FriendscapePanel target = panel;
 		if (target != null)

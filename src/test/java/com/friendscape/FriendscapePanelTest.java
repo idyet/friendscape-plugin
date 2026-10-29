@@ -4,6 +4,7 @@ import java.awt.Component;
 import java.awt.Container;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import javax.swing.JCheckBox;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -69,12 +70,25 @@ public class FriendscapePanelTest
 		{
 			actions.add("vote " + number + " #" + candidate);
 		}
+
+		@Override
+		public void setStandingsHidden(int number, boolean hidden)
+		{
+			actions.add((hidden ? "hide standings " : "show standings ") + number);
+		}
+
+		@Override
+		public void setCodewordHidden(int number, boolean hidden)
+		{
+			actions.add((hidden ? "hide codeword " : "show codeword ") + number);
+		}
 	}, MiniBoardView.TileIcons.NONE);
 
 	private static EventCard card(int number, CardState state, List<String> standing)
 	{
+		boolean live = state == CardState.TRACKING || state == CardState.ATTENTION;
 		return new EventCard(number, "Event " + number, state, "detail " + number, standing, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, true, null, false);
+			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -186,7 +200,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false)));
+			List.of("1st of 2, +5 xp"), List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -195,7 +209,7 @@ public class FriendscapePanelTest
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false)));
+			List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -212,7 +226,7 @@ public class FriendscapePanelTest
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION,
 			"On hold while Friendscape checks this RSN", List.of(), List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
-			false, true, true, null, false)));
+			false, true, true, null, false, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.reportButton.isVisible());
@@ -237,7 +251,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false);
+			List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null);
 	}
 
 	@Test
@@ -262,7 +276,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), List.of(),
-			"", large, EventCard.OPEN_BOARD, false, false, true, null, false)));
+			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);
@@ -371,7 +385,7 @@ public class FriendscapePanelTest
 	private static EventCard finalizedCard(CardState state)
 	{
 		return new EventCard(111111, "Event 111111", state, "Final", List.of(), List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true);
+			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null);
 	}
 
 	@Test
@@ -405,6 +419,71 @@ public class FriendscapePanelTest
 		assertTrue(view.menuButton.isVisible());
 	}
 
+	private static EventCard withCodeword(EventCard card, String codeword)
+	{
+		return new EventCard(card.getNumber(), card.getName(), card.getState(), card.getDetail(), card.getStanding(),
+			card.getNotes(), card.getRank(), card.getBoard(), card.getLink(), card.isUpload(), card.isReport(),
+			card.isLive(), card.getVote(), card.isFinalized(), codeword);
+	}
+
+	@Test
+	public void aLiveCardOffersToHideItsStandingsAndCodeword()
+	{
+		panel.update(discovered(withCodeword(card(111111, CardState.TRACKING, List.of()), "Mithril")));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.standingsItem.isVisible());
+		assertEquals("Hide standings", view.standingsItem.getText());
+		assertTrue(view.codewordItem.isVisible());
+		assertEquals("Hide codeword", view.codewordItem.getText());
+
+		view.standingsItem.doClick();
+		view.codewordItem.doClick();
+
+		assertEquals(List.of("hide standings 111111", "hide codeword 111111"), actions);
+	}
+
+	@Test
+	public void aHiddenChoiceOffersToShowAgain()
+	{
+		panel.update(PanelState.builder().sending(true).rsn("Iron Man").status(ConnectionStatus.CONNECTED)
+			.cards(List.of(withCodeword(card(111111, CardState.TRACKING, List.of()), "Mithril")))
+			.hiddenStandings(Set.of(111111)).hiddenCodewords(Set.of(111111)).build());
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertEquals("Show standings", view.standingsItem.getText());
+		assertEquals("Show codeword", view.codewordItem.getText());
+
+		view.standingsItem.doClick();
+		view.codewordItem.doClick();
+
+		assertEquals(List.of("show standings 111111", "show codeword 111111"), actions);
+	}
+
+	@Test
+	public void offersTheCodewordItemOnlyWithACodeword()
+	{
+		panel.update(discovered(card(111111, CardState.TRACKING, List.of())));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.standingsItem.isVisible());
+		assertFalse(view.codewordItem.isVisible());
+	}
+
+	@Test
+	public void offersNoOverlayItemsOnceNotLive()
+	{
+		for (EventCard card : List.of(card(111111, CardState.ENDED, List.of()), card(111111, CardState.LEFT, List.of()),
+			finalizedCard(CardState.FINAL)))
+		{
+			panel.update(discovered(card));
+			FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+			assertFalse(view.standingsItem.isVisible());
+			assertFalse(view.codewordItem.isVisible());
+		}
+	}
+
 	@Test
 	public void opensTheEventPage()
 	{
@@ -435,7 +514,7 @@ public class FriendscapePanelTest
 			+ "\"choice\":" + choice + "}";
 		DiscoveryResponse.Vote vote = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Vote.class);
 		return new EventCard(333333, "Skill of the week #1", CardState.VOTING, "Voting, closes 5 Nov 18:00", List.of(),
-			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false);
+			List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null);
 	}
 
 	@Test

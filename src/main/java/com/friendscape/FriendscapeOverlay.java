@@ -2,7 +2,9 @@ package com.friendscape;
 
 import java.awt.Dimension;
 import java.awt.Graphics2D;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.function.BooleanSupplier;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
@@ -12,7 +14,7 @@ import net.runelite.client.ui.overlay.components.LineComponent;
 class FriendscapeOverlay extends OverlayPanel
 {
 	private final BooleanSupplier shown;
-	private volatile List<EventCard> cards = List.of();
+	private volatile List<EventCard> rows = List.of();
 
 	FriendscapeOverlay(FriendscapePlugin plugin, BooleanSupplier shown)
 	{
@@ -21,25 +23,36 @@ class FriendscapeOverlay extends OverlayPanel
 		setPosition(OverlayPosition.TOP_LEFT);
 	}
 
-	void setCards(List<EventCard> cards)
+	/** The cards, less those whose standings the player hid from the card's menu. */
+	void setCards(List<EventCard> cards, Set<Integer> hidden)
 	{
-		this.cards = cards;
+		this.rows = rows(cards, hidden);
+	}
+
+	/** The live cards not hidden, in card order. */
+	static List<EventCard> rows(List<EventCard> cards, Set<Integer> hidden)
+	{
+		List<EventCard> rows = new ArrayList<>();
+		for (EventCard card : cards)
+		{
+			if (card.isLive() && !hidden.contains(card.getNumber()))
+			{
+				rows.add(card);
+			}
+		}
+		return rows;
 	}
 
 	@Override
 	public Dimension render(Graphics2D graphics)
 	{
-		List<EventCard> current = cards;
-		if (!shown.getAsBoolean() || current.stream().noneMatch(EventCard::isLive))
+		List<EventCard> current = rows;
+		if (!shown.getAsBoolean() || current.isEmpty())
 		{
 			return null;
 		}
 		for (EventCard card : current)
 		{
-			if (!card.isLive())
-			{
-				continue;
-			}
 			panelComponent.getChildren().add(LineComponent.builder()
 				.left(card.getName())
 				.leftColor(card.getState().getColor())

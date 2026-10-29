@@ -13,6 +13,11 @@ public interface FriendscapeConfig extends Config
 	String LEFT_EVENTS = "leftEvents";
 	/** Numbers of Events whose mini board the player closed (see {@link StoredEventNumbers}). */
 	String CLOSED_BOARDS = "closedBoards";
+	/** Numbers of Live Events left out of the standings overlay (see {@link StoredEventNumbers}). */
+	String HIDDEN_STANDINGS = "hiddenStandings";
+	/** Numbers of Live Events whose Codeword overlay the player hid (see {@link StoredEventNumbers}). */
+	String HIDDEN_CODEWORDS = "hiddenCodewords";
+	String CODEWORD_OVERLAYS = "codewordOverlays";
 	String WARNING = "This plugin submits your username, account hash, drops, kill counts, XP and screenshots"
 		+ " to a 3rd-party server (friendscape) not controlled or verified by the RuneLite Developers.";
 
@@ -75,6 +80,28 @@ public interface FriendscapeConfig extends Config
 	}
 
 	@ConfigItem(
+		keyName = CODEWORD_OVERLAYS,
+		name = "Show codeword overlays",
+		description = "Show each Live bingo Event's Codeword in game, so screenshots for manual uploads carry it",
+		position = 5
+	)
+	default boolean codewordOverlays()
+	{
+		return true;
+	}
+
+	@ConfigItem(
+		keyName = "codewordTimestamp",
+		name = "Show timestamp on codeword overlays",
+		description = "Show the current time in UTC next to each Codeword",
+		position = 6
+	)
+	default boolean codewordTimestamp()
+	{
+		return true;
+	}
+
+	@ConfigItem(
 		keyName = LEFT_EVENTS,
 		name = "",
 		description = "",
@@ -92,6 +119,28 @@ public interface FriendscapeConfig extends Config
 		hidden = true
 	)
 	default String closedBoards()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = HIDDEN_STANDINGS,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default String hiddenStandings()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = HIDDEN_CODEWORDS,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default String hiddenCodewords()
 	{
 		return "";
 	}

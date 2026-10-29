@@ -102,6 +102,20 @@ public class DiscoveryResponseTest
 	}
 
 	@Test
+	public void namesTheLiveEventsWhetherLeftOrRemoved()
+	{
+		DiscoveryResponse response = parse(
+			event(111111, "live", "on_roster", ""),
+			event(222222, "live", "removed", ""),
+			event(333333, "ended", "on_roster", ""),
+			event(444444, "scheduled", "on_roster", ""),
+			event(555555, "live", "held", ""));
+
+		assertEquals(Set.of(111111, 222222, 555555), response.liveNumbers());
+		assertEquals(Set.of(), GSON.fromJson("{}", DiscoveryResponse.class).liveNumbers());
+	}
+
+	@Test
 	public void isEmptyWithNoEvents()
 	{
 		assertTrue(parse().cards(Set.of(), Map.of(), NOW, ZoneOffset.UTC).isEmpty());

@@ -19,4 +19,10 @@ class PanelState
 	/** Events whose mini board the player closed (SPEC 10.3). */
 	@Builder.Default
 	Set<Integer> closedBoards = Set.of();
+	/** Events left out of the standings overlay (SPEC 10.3). */
+	@Builder.Default
+	Set<Integer> hiddenStandings = Set.of();
+	/** Events whose Codeword overlay the player hid (SPEC 10.3). */
+	@Builder.Default
+	Set<Integer> hiddenCodewords = Set.of();
 }
