@@ -19,7 +19,7 @@ public interface FriendscapeConfig extends Config
 	String HIDDEN_STANDINGS = "hiddenStandings";
 	/** Numbers of Live Events whose Codeword overlay the player hid (see {@link StoredEventNumbers}). */
 	String HIDDEN_CODEWORDS = "hiddenCodewords";
-	/** The panel shows cards under a header per Group (SPEC 10.3); off is one flat list. */
+	/** The panel shows cards under a header per Group (SPEC 10.3), the default; off is one flat list. */
 	String BY_GROUP = "byGroup";
 	/** Group numbers whose panel header the player collapsed (see {@link CardGroups#parseCollapsed}). */
 	String COLLAPSED_GROUPS = "collapsedGroups";
@@ -89,7 +89,7 @@ public interface FriendscapeConfig extends Config
 	)
 	default boolean standingsOverlay()
 	{
-		return true;
+		return false;
 	}
 
 	@ConfigItem(
@@ -200,7 +200,7 @@ public interface FriendscapeConfig extends Config
 	)
 	default boolean byGroup()
 	{
-		return false;
+		return true;
 	}
 
 	@ConfigItem(
