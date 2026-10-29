@@ -902,11 +902,11 @@ public class FriendscapePlugin extends Plugin
 		configManager.setConfiguration(FriendscapeConfig.GROUP, FriendscapeConfig.LEFT_EVENTS, StoredEventNumbers.format(left));
 	}
 
-	/** Adds an Event number to a stored set, or takes it out; writes only on a change. */
-	private void setStored(String key, String stored, int number, boolean in)
+	/** Puts an Event number in a stored set, or takes it out; writes only on a change. */
+	private void setStored(String key, String stored, int number, boolean member)
 	{
 		Set<Integer> numbers = new HashSet<>(StoredEventNumbers.parse(stored));
-		if (in ? numbers.add(number) : numbers.remove(number))
+		if (member ? numbers.add(number) : numbers.remove(number))
 		{
 			configManager.setConfiguration(FriendscapeConfig.GROUP, key, StoredEventNumbers.format(numbers));
 		}
@@ -1004,18 +1004,18 @@ public class FriendscapePlugin extends Plugin
 		SubmissionSender queued = sender;
 		List<EventCard> cards = found == null ? null : found.cards(left(),
 			queued == null ? Map.of() : queued.queued(accountHash), Instant.now(), ZoneId.systemDefault());
-		List<EventCard> overlaid = cards == null ? List.of() : cards;
+		List<EventCard> overlayCards = cards == null ? List.of() : cards;
 		Set<Integer> hiddenStandings = StoredEventNumbers.parse(config.hiddenStandings());
 		Set<Integer> hiddenCodewords = StoredEventNumbers.parse(config.hiddenCodewords());
 		FriendscapeOverlay shownOverlay = overlay;
 		if (shownOverlay != null)
 		{
-			shownOverlay.setCards(overlaid, hiddenStandings);
+			shownOverlay.setCards(overlayCards, hiddenStandings);
 		}
 		CodewordOverlays shownCodewords = codewordOverlays;
 		if (shownCodewords != null)
 		{
-			shownCodewords.show(config.codewordOverlays() ? CodewordOverlays.wanted(overlaid, hiddenCodewords) : Map.of());
+			shownCodewords.show(config.codewordOverlays() ? CodewordOverlays.wanted(overlayCards, hiddenCodewords) : Map.of());
 		}
 		PanelState state = PanelState.builder()
 			.sending(config.sendData())

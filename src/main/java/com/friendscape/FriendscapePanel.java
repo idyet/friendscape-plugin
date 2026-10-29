@@ -64,10 +64,10 @@ class FriendscapePanel extends PluginPanel
 		/** Votes from a Voting card for a Candidate, by its Ballot place (SPEC 4.9). */
 		void vote(int number, int candidate);
 
-		/** Leaves a live Event out of the standings overlay, or brings it back (SPEC 10.3). */
+		/** Leaves a Live Event out of the standings overlay, or brings it back (SPEC 10.3). */
 		void setStandingsHidden(int number, boolean hidden);
 
-		/** Hides a live Event's Codeword overlay, or brings it back (SPEC 10.3). */
+		/** Hides a Live Event's Codeword overlay, or brings it back (SPEC 10.3). */
 		void setCodewordHidden(int number, boolean hidden);
 	}
 

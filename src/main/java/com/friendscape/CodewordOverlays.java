@@ -1,7 +1,6 @@
 package com.friendscape;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -11,7 +10,7 @@ import java.util.function.IntFunction;
 import net.runelite.client.ui.overlay.Overlay;
 
 /**
- * The Codeword overlays in game (SPEC 10.3): one per live card with a Codeword the player has not
+ * The Codeword overlays in game (SPEC 10.3): one per Live card with a Codeword the player has not
  * hidden. Adds and removes them as cards come and go; called from any thread.
  */
 class CodewordOverlays
@@ -20,7 +19,7 @@ class CodewordOverlays
 	private final Consumer<Overlay> remove;
 	private final IntFunction<CodewordOverlay> create;
 	/** By Event number. */
-	private final Map<Integer, CodewordOverlay> shown = new HashMap<>();
+	private final Map<Integer, CodewordOverlay> overlays = new HashMap<>();
 	/** Set by {@link #close}: a late refresh must not add overlays back once the plugin stops. */
 	private boolean closed;
 
@@ -52,23 +51,23 @@ class CodewordOverlays
 		{
 			return;
 		}
-		for (Iterator<Map.Entry<Integer, CodewordOverlay>> it = shown.entrySet().iterator(); it.hasNext(); )
+		overlays.entrySet().removeIf(entry ->
 		{
-			Map.Entry<Integer, CodewordOverlay> entry = it.next();
-			if (!codewords.containsKey(entry.getKey()))
+			boolean gone = !codewords.containsKey(entry.getKey());
+			if (gone)
 			{
 				remove.accept(entry.getValue());
-				it.remove();
 			}
-		}
+			return gone;
+		});
 		codewords.forEach((number, codeword) ->
 		{
-			CodewordOverlay overlay = shown.get(number);
+			CodewordOverlay overlay = overlays.get(number);
 			if (overlay == null)
 			{
 				overlay = create.apply(number);
 				overlay.setCodeword(codeword);
-				shown.put(number, overlay);
+				overlays.put(number, overlay);
 				add.accept(overlay);
 			}
 			else
@@ -88,6 +87,6 @@ class CodewordOverlays
 	/** The overlay showing an Event's Codeword, or null. */
 	synchronized CodewordOverlay overlay(int number)
 	{
-		return shown.get(number);
+		return overlays.get(number);
 	}
 }

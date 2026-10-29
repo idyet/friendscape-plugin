@@ -74,7 +74,7 @@ class DiscoveryResponse
 		Vote vote;
 		/**
 		 * The Codeword while the Event is Live with it on; null otherwise, and from older servers. Held
-		 * and removed entries carry it too: the card decides who shows it.
+		 * and removed entries carry it too: the card decides whether it shows.
 		 */
 		String codeword;
 	}

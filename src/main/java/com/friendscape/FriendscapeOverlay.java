@@ -29,7 +29,7 @@ class FriendscapeOverlay extends OverlayPanel
 		this.rows = rows(cards, hidden);
 	}
 
-	/** The live cards not hidden, in card order. */
+	/** The Live cards not hidden from the standings overlay (SPEC 10.3), in card order. */
 	static List<EventCard> rows(List<EventCard> cards, Set<Integer> hidden)
 	{
 		List<EventCard> rows = new ArrayList<>();

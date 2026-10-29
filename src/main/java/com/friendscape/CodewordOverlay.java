@@ -1,6 +1,7 @@
 package com.friendscape;
 
 import java.awt.Dimension;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -10,6 +11,7 @@ import java.util.function.BooleanSupplier;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.components.ComponentConstants;
 import net.runelite.client.ui.overlay.components.LineComponent;
 
 /**
@@ -21,6 +23,8 @@ class CodewordOverlay extends OverlayPanel
 {
 	private static final DateTimeFormatter TIMESTAMP =
 		DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'", Locale.ENGLISH).withZone(ZoneOffset.UTC);
+	/** The space between the Codeword and the timestamp. */
+	private static final int GAP = 10;
 
 	private final int number;
 	private final BooleanSupplier shown;
@@ -65,9 +69,16 @@ class CodewordOverlay extends OverlayPanel
 		{
 			return null;
 		}
+		String current = codeword;
+		String time = timestamped.getAsBoolean() ? timestamp(Instant.now()) : "";
+		// Wide enough for one line: the default panel width would wrap a long Codeword
+		FontMetrics metrics = graphics.getFontMetrics();
+		int width = metrics.stringWidth(current) + (time.isEmpty() ? 0 : GAP + metrics.stringWidth(time))
+			+ 2 * ComponentConstants.STANDARD_BORDER;
+		panelComponent.setPreferredSize(new Dimension(width, 0));
 		panelComponent.getChildren().add(LineComponent.builder()
-			.left(codeword)
-			.right(timestamped.getAsBoolean() ? timestamp(Instant.now()) : "")
+			.left(current)
+			.right(time)
 			.build());
 		return super.render(graphics);
 	}

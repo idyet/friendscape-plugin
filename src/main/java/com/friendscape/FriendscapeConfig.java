@@ -17,7 +17,9 @@ public interface FriendscapeConfig extends Config
 	String HIDDEN_STANDINGS = "hiddenStandings";
 	/** Numbers of Live Events whose Codeword overlay the player hid (see {@link StoredEventNumbers}). */
 	String HIDDEN_CODEWORDS = "hiddenCodewords";
+	/** Master switch for every Codeword overlay. */
 	String CODEWORD_OVERLAYS = "codewordOverlays";
+	String CODEWORD_TIMESTAMP = "codewordTimestamp";
 	String WARNING = "This plugin submits your username, account hash, drops, kill counts, XP and screenshots"
 		+ " to a 3rd-party server (friendscape) not controlled or verified by the RuneLite Developers.";
 
@@ -91,7 +93,7 @@ public interface FriendscapeConfig extends Config
 	}
 
 	@ConfigItem(
-		keyName = "codewordTimestamp",
+		keyName = CODEWORD_TIMESTAMP,
 		name = "Show timestamp on codeword overlays",
 		description = "Show the current time in UTC next to each Codeword",
 		position = 6
