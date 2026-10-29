@@ -61,6 +61,7 @@ Each live bingo Event gets its own overlay with the Event's Codeword and the cur
 | Show timestamp on codeword overlays | On | Shows the current time in UTC next to each Codeword. |
 | Codeword color | Green | The color of the Codeword on codeword overlays. |
 | Timestamp color | White | The color of the timestamp on codeword overlays. |
+| Keep finalized Events (days) | 1 | How many days a Finalized Event's card stays in the panel, 0 to 7. 0 removes it on Finalize. |
 
 ## Privacy
 

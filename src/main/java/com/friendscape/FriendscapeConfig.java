@@ -4,6 +4,7 @@ import java.awt.Color;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Range;
 
 @ConfigGroup(FriendscapeConfig.GROUP)
 public interface FriendscapeConfig extends Config
@@ -23,6 +24,9 @@ public interface FriendscapeConfig extends Config
 	String CODEWORD_TIMESTAMP = "codewordTimestamp";
 	String CODEWORD_COLOR = "codewordColor";
 	String TIMESTAMP_COLOR = "timestampColor";
+	String KEEP_FINALIZED_DAYS = "keepFinalizedDays";
+	/** The server stops listing a Finalized Event 7 days after Finalize, which caps Keep finalized Events. */
+	int MAX_KEEP_FINALIZED_DAYS = 7;
 	String WARNING = "This plugin submits your username, account hash, drops, kill counts, XP and screenshots"
 		+ " to a 3rd-party server (friendscape) not controlled or verified by the RuneLite Developers.";
 
@@ -126,6 +130,18 @@ public interface FriendscapeConfig extends Config
 	default Color timestampColor()
 	{
 		return Color.WHITE;
+	}
+
+	@Range(min = 0, max = MAX_KEEP_FINALIZED_DAYS)
+	@ConfigItem(
+		keyName = KEEP_FINALIZED_DAYS,
+		name = "Keep finalized Events (days)",
+		description = "How many days a Finalized Event's card stays in the panel. 0 removes it on Finalize",
+		position = 9
+	)
+	default int keepFinalizedDays()
+	{
+		return 1;
 	}
 
 	@ConfigItem(

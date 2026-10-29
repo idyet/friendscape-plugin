@@ -1,6 +1,7 @@
 package com.friendscape;
 
 import com.google.gson.Gson;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ public class DiscoveryResponseTest
 {
 	private static final Gson GSON = new Gson();
 	private static final Instant NOW = Instant.parse("2026-11-03T12:00:00Z");
+	private static final Duration WEEK = Duration.ofDays(FriendscapeConfig.MAX_KEEP_FINALIZED_DAYS);
 
 	private static String event(int number, String phase, String entry, String extra)
 	{
@@ -41,7 +43,7 @@ public class DiscoveryResponseTest
 	{
 		DiscoveryResponse response = parse(event(222222, "live", "on_roster", ""), event(111111, "scheduled", "on_roster", ""));
 
-		assertEquals(List.of(222222, 111111), numbers(response.cards(Set.of(), Map.of(), NOW, ZoneOffset.UTC)));
+		assertEquals(List.of(222222, 111111), numbers(response.cards(Set.of(), Map.of(), WEEK, NOW, ZoneOffset.UTC)));
 	}
 
 	@Test
@@ -72,7 +74,7 @@ public class DiscoveryResponseTest
 			event(held, "live", "held", ""));
 
 		assertEquals(List.of(live, held, votingSooner, votingLater, soon, unscheduled, ended, finalized, left, removed,
-			leftVoting), numbers(response.cards(Set.of(left, leftVoting), Map.of(), NOW, ZoneOffset.UTC)));
+			leftVoting), numbers(response.cards(Set.of(left, leftVoting), Map.of(), WEEK, NOW, ZoneOffset.UTC)));
 	}
 
 	private static String vote(String closesAt)
@@ -87,7 +89,27 @@ public class DiscoveryResponseTest
 			event(111111, "finalized", "on_roster", "\"finalizedAt\":\"2026-10-28T12:00:01.000Z\""),
 			event(222222, "finalized", "on_roster", "\"finalizedAt\":\"2026-10-27T12:00:00.000Z\""));
 
-		assertEquals(List.of(111111), numbers(response.cards(Set.of(), Map.of(), NOW, ZoneOffset.UTC)));
+		assertEquals(List.of(111111), numbers(response.cards(Set.of(), Map.of(), WEEK, NOW, ZoneOffset.UTC)));
+	}
+
+	@Test
+	public void removesAFinalizedCardOnceKeepFinalizedPasses()
+	{
+		DiscoveryResponse response = parse(
+			event(111111, "finalized", "on_roster", "\"finalizedAt\":\"2026-11-02T12:00:01.000Z\""),
+			event(222222, "finalized", "on_roster", "\"finalizedAt\":\"2026-11-02T12:00:00.000Z\""));
+
+		assertEquals(List.of(111111), numbers(response.cards(Set.of(), Map.of(), Duration.ofDays(1), NOW, ZoneOffset.UTC)));
+	}
+
+	@Test
+	public void keepFinalizedOfZeroRemovesACardOnFinalize()
+	{
+		DiscoveryResponse response = parse(
+			event(111111, "finalized", "on_roster", "\"finalizedAt\":\"2026-11-03T12:00:00.000Z\""),
+			event(222222, "ended", "on_roster", ""));
+
+		assertEquals(List.of(222222), numbers(response.cards(Set.of(), Map.of(), Duration.ZERO, NOW, ZoneOffset.UTC)));
 	}
 
 	@Test
@@ -95,7 +117,7 @@ public class DiscoveryResponseTest
 	{
 		DiscoveryResponse response = parse(event(111111, "live", "on_roster", ""), event(222222, "live", "on_roster", ""));
 
-		List<EventCard> cards = response.cards(Set.of(222222), Map.of(), NOW, ZoneOffset.UTC);
+		List<EventCard> cards = response.cards(Set.of(222222), Map.of(), WEEK, NOW, ZoneOffset.UTC);
 
 		assertEquals(CardState.TRACKING, cards.get(0).getState());
 		assertEquals(CardState.LEFT, cards.get(1).getState());
@@ -118,8 +140,8 @@ public class DiscoveryResponseTest
 	@Test
 	public void isEmptyWithNoEvents()
 	{
-		assertTrue(parse().cards(Set.of(), Map.of(), NOW, ZoneOffset.UTC).isEmpty());
-		assertTrue(GSON.fromJson("{}", DiscoveryResponse.class).cards(Set.of(), Map.of(), NOW, ZoneOffset.UTC).isEmpty());
+		assertTrue(parse().cards(Set.of(), Map.of(), WEEK, NOW, ZoneOffset.UTC).isEmpty());
+		assertTrue(GSON.fromJson("{}", DiscoveryResponse.class).cards(Set.of(), Map.of(), WEEK, NOW, ZoneOffset.UTC).isEmpty());
 	}
 
 	@Test

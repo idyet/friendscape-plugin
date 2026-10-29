@@ -24,8 +24,6 @@ import lombok.extern.slf4j.Slf4j;
 @Value
 class DiscoveryResponse
 {
-	/** A Finalized Event's card goes this long after Finalize, as the server stops listing it. */
-	static final Duration FINALIZED_VISIBLE = Duration.ofDays(7);
 	/**
 	 * After an Event's end, how long a Reading may still be its end Reading: the server takes one up
 	 * to a minute after end, plus the plugin's retries while the server's clock lags.
@@ -371,11 +369,13 @@ class DiscoveryResponse
 	}
 
 	/**
-	 * One card per Event, less Finalized ones past their week: live first, then Voting (soonest close
-	 * first), scheduled, not scheduled yet, ended, Finalized, and last those left or off the Roster,
-	 * in the server's order within each. {@code queued} holds this install's Submissions by Event number.
+	 * One card per Event, less Finalized ones {@code keepFinalized} or longer after Finalize: live
+	 * first, then Voting (soonest close first), scheduled, not scheduled yet, ended, Finalized, and last
+	 * those left or off the Roster, in the server's order within each. {@code queued} holds this
+	 * install's Submissions by Event number.
 	 */
-	List<EventCard> cards(Set<Integer> left, Map<Integer, EventCard.Queued> queued, Instant now, ZoneId zone)
+	List<EventCard> cards(Set<Integer> left, Map<Integer, EventCard.Queued> queued, Duration keepFinalized,
+		Instant now, ZoneId zone)
 	{
 		Map<DiscoveredEvent, CardBucket> buckets = new IdentityHashMap<>();
 		Map<DiscoveredEvent, Instant> closes = new IdentityHashMap<>();
@@ -392,7 +392,7 @@ class DiscoveryResponse
 		for (DiscoveredEvent event : ordered)
 		{
 			Instant finalizedAt = parse(event, event.getFinalizedAt());
-			if (finalizedAt != null && !now.isBefore(finalizedAt.plus(FINALIZED_VISIBLE)))
+			if (finalizedAt != null && !now.isBefore(finalizedAt.plus(keepFinalized)))
 			{
 				continue;
 			}

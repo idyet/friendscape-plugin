@@ -7,6 +7,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -485,7 +486,8 @@ public class FriendscapePlugin extends Plugin
 		}
 		if (FriendscapeConfig.HIDDEN_STANDINGS.equals(event.getKey())
 			|| FriendscapeConfig.HIDDEN_CODEWORDS.equals(event.getKey())
-			|| FriendscapeConfig.CODEWORD_OVERLAYS.equals(event.getKey()))
+			|| FriendscapeConfig.CODEWORD_OVERLAYS.equals(event.getKey())
+			|| FriendscapeConfig.KEEP_FINALIZED_DAYS.equals(event.getKey()))
 		{
 			refreshPanel();
 			return;
@@ -1015,7 +1017,8 @@ public class FriendscapePlugin extends Plugin
 		DiscoveryResponse found = discovery;
 		SubmissionSender queued = sender;
 		List<EventCard> cards = found == null ? null : found.cards(left(),
-			queued == null ? Map.of() : queued.queued(accountHash), Instant.now(), ZoneId.systemDefault());
+			queued == null ? Map.of() : queued.queued(accountHash), keepFinalized(),
+			Instant.now(), ZoneId.systemDefault());
 		List<EventCard> overlayCards = cards == null ? List.of() : cards;
 		Set<Integer> hiddenStandings = StoredEventNumbers.parse(config.hiddenStandings());
 		Set<Integer> hiddenCodewords = StoredEventNumbers.parse(config.hiddenCodewords());
@@ -1043,6 +1046,13 @@ public class FriendscapePlugin extends Plugin
 		{
 			SwingUtilities.invokeLater(() -> target.update(state));
 		}
+	}
+
+	/** Keep finalized Events as a Duration; the spinner bounds it, a hand-edited config does not. */
+	private Duration keepFinalized()
+	{
+		int days = Math.max(0, Math.min(FriendscapeConfig.MAX_KEEP_FINALIZED_DAYS, config.keepFinalizedDays()));
+		return Duration.ofDays(days);
 	}
 
 	private static HttpUrl apiBase()
