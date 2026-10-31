@@ -381,6 +381,14 @@ public class FriendscapePanelTest
 			null, List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null);
 	}
 
+	/** A drawn bingo card around a board given as discovery JSON. */
+	private static EventCard bingoCard(String boardJson)
+	{
+		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(boardJson, DiscoveryResponse.Board.class);
+		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null, List.of(), "",
+			board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null);
+	}
+
 	@Test
 	public void showsThePlayersTeamBoardFirstWithATeamDropdownInStandingsOrder()
 	{
@@ -391,8 +399,8 @@ public class FriendscapePanelTest
 		assertEquals(1, board.shownTeam());
 		assertTrue(board.teamPicker.isVisible());
 		assertEquals(2, board.teamPicker.getItemCount());
-		assertEquals("Blue", board.teamPicker.getItemAt(0));
-		assertEquals("Red (you)", board.teamPicker.getItemAt(1));
+		assertEquals("Blue", MiniBoardView.label(board.teamPicker.getItemAt(0)));
+		assertEquals("Red (you)", MiniBoardView.label(board.teamPicker.getItemAt(1)));
 		assertEquals(1, board.teamPicker.getSelectedIndex());
 		assertEquals(4, board.cells.size());
 		assertEquals("<html>Tile 1: Blood shards<br>50%</html>", board.cells.get(0).tooltip());
@@ -446,16 +454,29 @@ public class FriendscapePanelTest
 			+ "{\"team\":3,\"name\":\"Green\",\"rank\":1,\"of\":3,\"points\":5,\"mine\":false,\"tiles\":[]},"
 			+ "{\"team\":2,\"name\":\"Blue\",\"rank\":2,\"of\":3,\"points\":3,\"mine\":true,\"tiles\":[]},"
 			+ "{\"team\":1,\"name\":\"Red\",\"rank\":3,\"of\":3,\"points\":0,\"mine\":true,\"tiles\":[]}]}";
-		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
-		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null,
-			List.of(), "", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null)));
+		panel.update(discovered(bingoCard(json)));
 		MiniBoardView view = panel.cardViews.get(0).board;
 
-		assertEquals("Green", view.teamPicker.getItemAt(0));
-		assertEquals("Blue (you)", view.teamPicker.getItemAt(1));
-		assertEquals("Red (you)", view.teamPicker.getItemAt(2));
+		assertEquals("Green", MiniBoardView.label(view.teamPicker.getItemAt(0)));
+		assertEquals("Blue (you)", MiniBoardView.label(view.teamPicker.getItemAt(1)));
+		assertEquals("Red (you)", MiniBoardView.label(view.teamPicker.getItemAt(2)));
 		assertEquals(2, view.shownTeam());
 		assertEquals("Blue: 2nd of 3, 3 pts", view.standing.getText());
+	}
+
+	@Test
+	public void twoTeamsWithOneNameStaySeparatePicks()
+	{
+		String json = "{\"size\":1,\"tiles\":[],\"teams\":["
+			+ "{\"team\":1,\"name\":\"Red\",\"rank\":1,\"of\":2,\"points\":5,\"mine\":false,\"tiles\":[]},"
+			+ "{\"team\":2,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":5,\"mine\":false,\"tiles\":[]}]}";
+		panel.update(discovered(bingoCard(json)));
+		MiniBoardView view = panel.cardViews.get(0).board;
+
+		view.teamPicker.setSelectedIndex(1);
+
+		assertEquals(2, view.shownTeam());
+		assertEquals(1, view.teamPicker.getSelectedIndex());
 	}
 
 	@Test
@@ -463,9 +484,7 @@ public class FriendscapePanelTest
 	{
 		String json = "{\"size\":1,\"tiles\":[],\"teams\":["
 			+ "{\"team\":1,\"name\":\"Red\",\"rank\":1,\"of\":1,\"points\":0,\"mine\":true,\"tiles\":[]}]}";
-		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
-		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null,
-			List.of(), "", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null)));
+		panel.update(discovered(bingoCard(json)));
 		MiniBoardView view = panel.cardViews.get(0).board;
 
 		assertFalse(view.teamPicker.isVisible());

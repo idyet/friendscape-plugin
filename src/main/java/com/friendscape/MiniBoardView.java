@@ -1,6 +1,7 @@
 package com.friendscape;
 
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
@@ -16,9 +17,11 @@ import java.util.List;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import net.runelite.client.ui.ColorScheme;
@@ -57,7 +60,7 @@ class MiniBoardView extends JPanel
 		ColorScheme.PROGRESS_COMPLETE_COLOR.getGreen(), ColorScheme.PROGRESS_COMPLETE_COLOR.getBlue(), 110);
 
 	/** Every Team in standings order, the player's marked "(you)". */
-	final JComboBox<String> teamPicker = new JComboBox<>();
+	final JComboBox<DiscoveryResponse.BoardTeam> teamPicker = new JComboBox<>();
 	/** The shown Team's place, as the dropdown switches standing with the board. */
 	final JLabel standing = new JLabel();
 	final List<Cell> cells = new ArrayList<>();
@@ -80,11 +83,25 @@ class MiniBoardView extends JPanel
 		List<DiscoveryResponse.BoardTeam> teams = board.teams();
 		for (DiscoveryResponse.BoardTeam team : teams)
 		{
-			teamPicker.addItem(team.isMine() ? team.getName() + " (you)" : team.getName());
+			teamPicker.addItem(team);
 		}
+		teamPicker.setRenderer(new DefaultListCellRenderer()
+		{
+			@Override
+			public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+				boolean isSelected, boolean cellHasFocus)
+			{
+				return super.getListCellRendererComponent(list, value == null ? "" : label((DiscoveryResponse.BoardTeam) value),
+					index, isSelected, cellHasFocus);
+			}
+		});
+		teamPicker.setFont(FontManager.getRunescapeSmallFont());
 		teamPicker.setFocusable(false);
 		teamPicker.setAlignmentX(LEFT_ALIGNMENT);
-		teamPicker.setMaximumSize(new Dimension(WIDTH, teamPicker.getPreferredSize().height));
+		// Full card width whatever the longest name, so a long one cannot widen the card
+		Dimension pickerSize = new Dimension(WIDTH, teamPicker.getPreferredSize().height);
+		teamPicker.setPreferredSize(pickerSize);
+		teamPicker.setMaximumSize(pickerSize);
 		// One Team has nothing to switch to
 		boolean switchable = teams.size() > 1;
 		teamPicker.setVisible(switchable);
@@ -108,16 +125,22 @@ class MiniBoardView extends JPanel
 		add(standing);
 		add(grid);
 		showTeam(teamNumber);
-		// Added after the first showTeam so its selection is not taken for a pick
+		// Added after the first addItem and showTeam, whose selections are not picks
 		teamPicker.addActionListener(e ->
 		{
-			int index = teamPicker.getSelectedIndex();
-			if (index >= 0 && teams.get(index).getTeam() != shownTeam)
+			DiscoveryResponse.BoardTeam picked = (DiscoveryResponse.BoardTeam) teamPicker.getSelectedItem();
+			if (picked != null && picked.getTeam() != shownTeam)
 			{
-				showTeam(teams.get(index).getTeam());
+				showTeam(picked.getTeam());
 				listener.teamChosen(shownTeam);
 			}
 		});
+	}
+
+	/** A dropdown line: the Team's name, marked when the player is on it. */
+	static String label(DiscoveryResponse.BoardTeam team)
+	{
+		return team.isMine() ? team.getName() + " (you)" : team.getName();
 	}
 
 	/** The side of one square: as large as the card allows, up to a sprite's size. */
@@ -136,21 +159,17 @@ class MiniBoardView extends JPanel
 	void showTeam(int teamNumber)
 	{
 		List<DiscoveryResponse.BoardTeam> teams = board.teams();
-		int index = 0;
-		for (int i = 0; i < teams.size(); i++)
+		DiscoveryResponse.BoardTeam team = teams.isEmpty() ? null : teams.get(0);
+		for (DiscoveryResponse.BoardTeam candidate : teams)
 		{
-			if (teams.get(i).getTeam() == teamNumber)
+			if (candidate.getTeam() == teamNumber)
 			{
-				index = i;
+				team = candidate;
 			}
 		}
-		DiscoveryResponse.BoardTeam team = teams.isEmpty() ? null : teams.get(index);
 		shownTeam = team == null ? teamNumber : team.getTeam();
 		standing.setText(team == null ? "" : team.getName() + ": " + EventCard.bingoPlace(team));
-		if (team != null)
-		{
-			teamPicker.setSelectedIndex(index);
-		}
+		teamPicker.setSelectedItem(team);
 
 		grid.removeAll();
 		cells.clear();
