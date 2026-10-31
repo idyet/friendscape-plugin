@@ -308,7 +308,7 @@ class FriendscapePanel extends PluginPanel
 		return label;
 	}
 
-	/** The player's first Team, else the leader: what a mini board shows until a chip is chosen. */
+	/** The player's first Team, else the leader: what a mini board shows until another Team is picked. */
 	private static int defaultTeam(DiscoveryResponse.Board board)
 	{
 		List<DiscoveryResponse.BoardTeam> mine = board.mine();

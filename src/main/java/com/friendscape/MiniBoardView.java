@@ -3,12 +3,10 @@ package com.friendscape;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
-import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -18,17 +16,17 @@ import java.util.List;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JToggleButton;
 import javax.swing.SwingUtilities;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * A bingo card's mini board (SPEC 10.3): Team chips over one Team's grid. Cells show the Tile's
+ * A bingo card's mini board (SPEC 10.3): a Team dropdown over one Team's grid. Cells show the Tile's
  * icon or number, green when done, a partial fill toward the next Tier; hover names the Tile and
  * its progress, a click opens it on the website. Nothing on it is editable.
  */
@@ -58,8 +56,9 @@ class MiniBoardView extends JPanel
 	private static final Color FILL = new Color(ColorScheme.PROGRESS_COMPLETE_COLOR.getRed(),
 		ColorScheme.PROGRESS_COMPLETE_COLOR.getGreen(), ColorScheme.PROGRESS_COMPLETE_COLOR.getBlue(), 110);
 
-	final List<JToggleButton> chips = new ArrayList<>();
-	/** The shown Team's place, as chips switch standing with the board. */
+	/** Every Team in standings order, the player's marked "(you)". */
+	final JComboBox<String> teamPicker = new JComboBox<>();
+	/** The shown Team's place, as the dropdown switches standing with the board. */
 	final JLabel standing = new JLabel();
 	final List<Cell> cells = new ArrayList<>();
 
@@ -78,25 +77,17 @@ class MiniBoardView extends JPanel
 		setOpaque(false);
 		setAlignmentX(LEFT_ALIGNMENT);
 
-		JPanel chipRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 2));
-		chipRow.setOpaque(false);
-		chipRow.setAlignmentX(LEFT_ALIGNMENT);
-		for (DiscoveryResponse.BoardTeam team : board.teams())
+		List<DiscoveryResponse.BoardTeam> teams = board.teams();
+		for (DiscoveryResponse.BoardTeam team : teams)
 		{
-			JToggleButton chip = new JToggleButton(team.getName());
-			chip.setFont(FontManager.getRunescapeSmallFont());
-			chip.setFocusable(false);
-			chip.setMargin(new Insets(1, 4, 1, 4));
-			chip.addActionListener(e ->
-			{
-				showTeam(team.getTeam());
-				listener.teamChosen(team.getTeam());
-			});
-			chips.add(chip);
-			chipRow.add(chip);
+			teamPicker.addItem(team.isMine() ? team.getName() + " (you)" : team.getName());
 		}
+		teamPicker.setFocusable(false);
+		teamPicker.setAlignmentX(LEFT_ALIGNMENT);
+		teamPicker.setMaximumSize(new Dimension(WIDTH, teamPicker.getPreferredSize().height));
 		// One Team has nothing to switch to
-		chipRow.setVisible(chips.size() > 1);
+		boolean switchable = teams.size() > 1;
+		teamPicker.setVisible(switchable);
 
 		int size = board.side();
 		int cell = cellSize(size);
@@ -111,12 +102,22 @@ class MiniBoardView extends JPanel
 		standing.setFont(FontManager.getRunescapeSmallFont());
 		standing.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		standing.setAlignmentX(LEFT_ALIGNMENT);
-		standing.setVisible(chips.size() > 1);
+		standing.setVisible(switchable);
 
-		add(chipRow);
+		add(teamPicker);
 		add(standing);
 		add(grid);
 		showTeam(teamNumber);
+		// Added after the first showTeam so its selection is not taken for a pick
+		teamPicker.addActionListener(e ->
+		{
+			int index = teamPicker.getSelectedIndex();
+			if (index >= 0 && teams.get(index).getTeam() != shownTeam)
+			{
+				showTeam(teams.get(index).getTeam());
+				listener.teamChosen(shownTeam);
+			}
+		});
 	}
 
 	/** The side of one square: as large as the card allows, up to a sprite's size. */
@@ -135,19 +136,20 @@ class MiniBoardView extends JPanel
 	void showTeam(int teamNumber)
 	{
 		List<DiscoveryResponse.BoardTeam> teams = board.teams();
-		DiscoveryResponse.BoardTeam team = teams.isEmpty() ? null : teams.get(0);
-		for (DiscoveryResponse.BoardTeam candidate : teams)
+		int index = 0;
+		for (int i = 0; i < teams.size(); i++)
 		{
-			if (candidate.getTeam() == teamNumber)
+			if (teams.get(i).getTeam() == teamNumber)
 			{
-				team = candidate;
+				index = i;
 			}
 		}
+		DiscoveryResponse.BoardTeam team = teams.isEmpty() ? null : teams.get(index);
 		shownTeam = team == null ? teamNumber : team.getTeam();
 		standing.setText(team == null ? "" : team.getName() + ": " + EventCard.bingoPlace(team));
-		for (int i = 0; i < chips.size(); i++)
+		if (team != null)
 		{
-			chips.get(i).setSelected(teams.get(i).getTeam() == shownTeam);
+			teamPicker.setSelectedIndex(index);
 		}
 
 		grid.removeAll();
