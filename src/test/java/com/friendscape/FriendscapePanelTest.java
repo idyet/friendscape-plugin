@@ -387,10 +387,12 @@ public class FriendscapePanelTest
 		String json = "{\"size\":2,\"tiles\":[{\"number\":1,\"name\":\"Blood shards\",\"tiers\":1},"
 			+ "{\"number\":2,\"name\":\"Vorkath\",\"tiers\":3}],\"teams\":["
 			+ "{\"team\":2,\"name\":\"Blue\",\"rank\":1,\"of\":2,\"points\":9,\"mine\":false,\"tiles\":["
-			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":1},{\"state\":\"open\",\"tier\":null,\"fill\":0},"
+			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":1,\"points\":5,\"gain\":null},"
+			+ "{\"state\":\"complete\",\"tier\":3,\"fill\":1,\"points\":45,\"gain\":null},"
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]},"
-			+ "{\"team\":1,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":0,\"mine\":true,\"tiles\":["
-			+ "{\"state\":\"open\",\"tier\":null,\"fill\":0.5},{\"state\":\"open\",\"tier\":1,\"fill\":0.25},"
+			+ "{\"team\":1,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":10,\"mine\":true,\"tiles\":["
+			+ "{\"state\":\"open\",\"tier\":null,\"fill\":0.5,\"points\":0,\"gain\":5},"
+			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":0.25,\"points\":10,\"gain\":5},"
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
@@ -415,13 +417,66 @@ public class FriendscapePanelTest
 		assertEquals(1, board.shownTeam());
 		assertTrue(board.teamPicker.isVisible());
 		assertEquals(2, board.teamPicker.getItemCount());
-		assertEquals("Blue", MiniBoardView.label(board.teamPicker.getItemAt(0)));
-		assertEquals("Red (you)", MiniBoardView.label(board.teamPicker.getItemAt(1)));
+		assertEquals("Blue: 9 pts", MiniBoardView.label(board.teamPicker.getItemAt(0)));
+		assertEquals("Red (you): 10 pts", MiniBoardView.label(board.teamPicker.getItemAt(1)));
 		assertEquals(1, board.teamPicker.getSelectedIndex());
 		assertEquals(4, board.cells.size());
-		assertEquals("<html>Tile 1: Blood shards<br>50%</html>", board.cells.get(0).tooltip());
-		assertEquals("<html>Tile 2: Vorkath<br>Tier 1 of 3, 25% to the next</html>", board.cells.get(1).tooltip());
-		assertEquals("Red: 2nd of 2, 0 pts", board.standing.getText());
+		assertEquals("<html>Tile 1: Blood shards<br>50% to complete: +5 pts</html>", board.cells.get(0).tooltip());
+		assertEquals("<html>Tile 2: Vorkath<br>Tier 1 of 3: 10 pts<br>25% to Tier 2: +5 pts</html>",
+			board.cells.get(1).tooltip());
+		assertTrue(board.cells.get(1).partial());
+		assertFalse(board.cells.get(0).partial());
+	}
+
+	@Test
+	public void aTooltipShowsTheNextTiersGainAndCompletedTilesTheirPoints()
+	{
+		String json = "{\"size\":2,\"tiles\":[{\"number\":1,\"name\":\"Zulrah\",\"tiers\":3},"
+			+ "{\"number\":2,\"name\":\"Shards\",\"tiers\":1}],\"teams\":["
+			+ "{\"team\":1,\"name\":\"Red\",\"rank\":1,\"of\":1,\"points\":0,\"mine\":true,\"tiles\":["
+			+ "{\"state\":\"open\",\"tier\":null,\"fill\":0.4,\"points\":0,\"gain\":10},"
+			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":1,\"points\":10,\"gain\":null},"
+			+ "{\"state\":\"free\",\"tier\":null,\"fill\":1,\"points\":0,\"gain\":null},"
+			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0,\"points\":0,\"gain\":null}]}]}";
+		panel.update(discovered(bingoCard(json)));
+		MiniBoardView view = panel.cardViews.get(0).board;
+
+		assertEquals("<html>Tile 1: Zulrah<br>40% to Tier 1: +10 pts</html>", view.cells.get(0).tooltip());
+		assertEquals("<html>Tile 2: Shards<br>Completed: 10 pts</html>", view.cells.get(1).tooltip());
+		assertFalse(view.cells.get(1).partial());
+		assertEquals("Free", view.cells.get(2).tooltip());
+	}
+
+	@Test
+	public void anOlderServerWithoutPointsKeepsTheProgressTooltip()
+	{
+		String json = "{\"size\":1,\"tiles\":[{\"number\":1,\"name\":\"Zulrah\",\"tiers\":3}],\"teams\":["
+			+ "{\"team\":1,\"name\":\"Red\",\"rank\":1,\"of\":1,\"points\":0,\"mine\":true,\"tiles\":["
+			+ "{\"state\":\"complete\",\"tier\":1,\"fill\":1}]}]}";
+		panel.update(discovered(bingoCard(json)));
+		MiniBoardView view = panel.cardViews.get(0).board;
+
+		assertEquals("<html>Tile 1: Zulrah<br>Tier 1 of 3, done</html>", view.cells.get(0).tooltip());
+		assertFalse(view.cells.get(0).partial());
+	}
+
+	@Test
+	public void aLongTeamNameIsCutButKeepsItsPoints()
+	{
+		String json = "{\"size\":1,\"tiles\":[],\"teams\":["
+			+ "{\"team\":1,\"name\":\"Very Long Team Name Indeed Here\",\"rank\":1,\"of\":2,\"points\":340,"
+			+ "\"mine\":true,\"tiles\":[]},"
+			+ "{\"team\":2,\"name\":\"Red\",\"rank\":2,\"of\":2,\"points\":5,\"mine\":false,\"tiles\":[]}]}";
+		panel.update(discovered(bingoCard(json)));
+		MiniBoardView view = panel.cardViews.get(0).board;
+		java.awt.FontMetrics metrics = view.teamPicker.getFontMetrics(view.teamPicker.getFont());
+
+		String fitted = MiniBoardView.label(view.teamPicker.getItemAt(0), metrics, MiniBoardView.LABEL_WIDTH);
+
+		assertTrue(fitted, fitted.endsWith("... (you): 340 pts"));
+		assertTrue(fitted, fitted.startsWith("Very"));
+		assertTrue(fitted, metrics.stringWidth(fitted) <= MiniBoardView.LABEL_WIDTH);
+		assertEquals("Red: 5 pts", MiniBoardView.label(view.teamPicker.getItemAt(1), metrics, MiniBoardView.LABEL_WIDTH));
 	}
 
 	@Test
@@ -455,8 +510,10 @@ public class FriendscapePanelTest
 		panel.update(discovered(bingoCard()));
 
 		panel.cardViews.get(0).board.teamPicker.setSelectedIndex(0);
-		assertEquals("<html>Tile 1: Blood shards<br>Done</html>", panel.cardViews.get(0).board.cells.get(0).tooltip());
-		assertEquals("Blue: 1st of 2, 9 pts", panel.cardViews.get(0).board.standing.getText());
+		assertEquals("<html>Tile 1: Blood shards<br>Completed: 5 pts</html>",
+			panel.cardViews.get(0).board.cells.get(0).tooltip());
+		assertEquals("<html>Tile 2: Vorkath<br>Completed: 45 pts</html>",
+			panel.cardViews.get(0).board.cells.get(1).tooltip());
 
 		panel.update(discovered(bingoCard()));
 		assertEquals(2, panel.cardViews.get(0).board.shownTeam());
@@ -473,11 +530,10 @@ public class FriendscapePanelTest
 		panel.update(discovered(bingoCard(json)));
 		MiniBoardView view = panel.cardViews.get(0).board;
 
-		assertEquals("Green", MiniBoardView.label(view.teamPicker.getItemAt(0)));
-		assertEquals("Blue (you)", MiniBoardView.label(view.teamPicker.getItemAt(1)));
-		assertEquals("Red (you)", MiniBoardView.label(view.teamPicker.getItemAt(2)));
+		assertEquals("Green: 5 pts", MiniBoardView.label(view.teamPicker.getItemAt(0)));
+		assertEquals("Blue (you): 3 pts", MiniBoardView.label(view.teamPicker.getItemAt(1)));
+		assertEquals("Red (you): 0 pts", MiniBoardView.label(view.teamPicker.getItemAt(2)));
 		assertEquals(2, view.shownTeam());
-		assertEquals("Blue: 2nd of 3, 3 pts", view.standing.getText());
 	}
 
 	@Test
@@ -496,7 +552,7 @@ public class FriendscapePanelTest
 	}
 
 	@Test
-	public void aOneTeamBoardHidesTheDropdownAndStanding()
+	public void aOneTeamBoardHidesTheDropdown()
 	{
 		String json = "{\"size\":1,\"tiles\":[],\"teams\":["
 			+ "{\"team\":1,\"name\":\"Red\",\"rank\":1,\"of\":1,\"points\":0,\"mine\":true,\"tiles\":[]}]}";
@@ -504,7 +560,6 @@ public class FriendscapePanelTest
 		MiniBoardView view = panel.cardViews.get(0).board;
 
 		assertFalse(view.teamPicker.isVisible());
-		assertFalse(view.standing.isVisible());
 	}
 
 	@Test

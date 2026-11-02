@@ -14,13 +14,14 @@ import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.Consumer;
 import javax.swing.BorderFactory;
+import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -30,8 +31,9 @@ import net.runelite.client.ui.PluginPanel;
 
 /**
  * A bingo card's mini board (SPEC 10.3): a Team dropdown over one Team's grid. Cells show the Tile's
- * icon or number, green when done, a partial fill toward the next Tier; hover names the Tile and
- * its progress, a click opens it on the website. Nothing on it is editable.
+ * icon or number, green at the top Tier, amber with some Tier reached, a partial fill toward the next
+ * Tier; hover names the Tile, its points and the next Tier's, a click opens it on the website.
+ * Nothing on it is editable.
  */
 class MiniBoardView extends JPanel
 {
@@ -56,13 +58,16 @@ class MiniBoardView extends JPanel
 	/** Item sprites are 36x32; larger squares only waste room. */
 	private static final int MAX_CELL = 32;
 	private static final int GAP = 2;
+	/** Between the dropdown and the grid. */
+	private static final int PICKER_GAP = 4;
+	/** What a dropdown line leaves for text: the card width less the arrow button and insets. */
+	static final int LABEL_WIDTH = WIDTH - 28;
+	private static final String ELLIPSIS = "...";
 	private static final Color FILL = new Color(ColorScheme.PROGRESS_COMPLETE_COLOR.getRed(),
 		ColorScheme.PROGRESS_COMPLETE_COLOR.getGreen(), ColorScheme.PROGRESS_COMPLETE_COLOR.getBlue(), 110);
 
-	/** Every Team in standings order, the player's marked "(you)". */
+	/** Every Team in standings order with its points, the player's marked "(you)". */
 	final JComboBox<DiscoveryResponse.BoardTeam> teamPicker = new JComboBox<>();
-	/** The shown Team's place, as the dropdown switches standing with the board. */
-	final JLabel standing = new JLabel();
 	final List<Cell> cells = new ArrayList<>();
 
 	private final DiscoveryResponse.Board board;
@@ -91,8 +96,11 @@ class MiniBoardView extends JPanel
 			public Component getListCellRendererComponent(JList<?> list, Object value, int index,
 				boolean isSelected, boolean cellHasFocus)
 			{
-				return super.getListCellRendererComponent(list, value == null ? "" : label((DiscoveryResponse.BoardTeam) value),
-					index, isSelected, cellHasFocus);
+				// The popup list narrows under a scrollbar, so fit to it once laid out
+				int width = list.getWidth() > 0 ? Math.min(LABEL_WIDTH, list.getWidth() - 4) : LABEL_WIDTH;
+				String text = value == null ? ""
+					: label((DiscoveryResponse.BoardTeam) value, list.getFontMetrics(teamPicker.getFont()), width);
+				return super.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
 			}
 		});
 		teamPicker.setFont(FontManager.getRunescapeSmallFont());
@@ -116,13 +124,11 @@ class MiniBoardView extends JPanel
 		grid.setMaximumSize(gridSize);
 		grid.setBorder(BorderFactory.createEmptyBorder());
 
-		standing.setFont(FontManager.getRunescapeSmallFont());
-		standing.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		standing.setAlignmentX(LEFT_ALIGNMENT);
-		standing.setVisible(switchable);
+		Component pickerGap = Box.createVerticalStrut(PICKER_GAP);
+		pickerGap.setVisible(switchable);
 
 		add(teamPicker);
-		add(standing);
+		add(pickerGap);
 		add(grid);
 		showTeam(teamNumber);
 		// Added after the first addItem and showTeam, whose selections are not picks
@@ -137,10 +143,32 @@ class MiniBoardView extends JPanel
 		});
 	}
 
-	/** A dropdown line: the Team's name, marked when the player is on it. */
+	/** A dropdown line: the Team's name, marked when the player is on it, and its points. */
 	static String label(DiscoveryResponse.BoardTeam team)
 	{
-		return team.isMine() ? team.getName() + " (you)" : team.getName();
+		return (team.getName() == null ? "" : team.getName()) + suffix(team);
+	}
+
+	/** A dropdown line fitted to {@code width}: only the name is cut, so the points always show. */
+	static String label(DiscoveryResponse.BoardTeam team, FontMetrics metrics, int width)
+	{
+		String name = team.getName() == null ? "" : team.getName();
+		String suffix = suffix(team);
+		if (metrics.stringWidth(name + suffix) <= width)
+		{
+			return name + suffix;
+		}
+		int keep = name.length();
+		while (keep > 0 && metrics.stringWidth(name.substring(0, keep) + ELLIPSIS + suffix) > width)
+		{
+			keep--;
+		}
+		return name.substring(0, keep).trim() + ELLIPSIS + suffix;
+	}
+
+	private static String suffix(DiscoveryResponse.BoardTeam team)
+	{
+		return (team.isMine() ? " (you)" : "") + String.format(Locale.ENGLISH, ": %,d pts", team.getPoints());
 	}
 
 	/** The side of one square: as large as the card allows, up to a sprite's size. */
@@ -168,7 +196,6 @@ class MiniBoardView extends JPanel
 			}
 		}
 		shownTeam = team == null ? teamNumber : team.getTeam();
-		standing.setText(team == null ? "" : team.getName() + ": " + EventCard.bingoPlace(team));
 		teamPicker.setSelectedItem(team);
 
 		grid.removeAll();
@@ -244,7 +271,13 @@ class MiniBoardView extends JPanel
 			return state != null && (DiscoveryResponse.TeamTile.COMPLETE.equals(state.getState()) || isFree());
 		}
 
-		/** Hover text: the Tile's name and how far the shown Team is. */
+		/** Some Tier reached with more left; an older server sends no gain, so its Tiles read as done. */
+		boolean partial()
+		{
+			return isDone() && !isFree() && state.getGain() != null;
+		}
+
+		/** Hover text: the Tile's name, the shown Team's points and what the next Tier is worth. */
 		String tooltip()
 		{
 			if (isFree())
@@ -260,6 +293,26 @@ class MiniBoardView extends JPanel
 		}
 
 		private String progress()
+		{
+			if (state == null || state.getPoints() == null || (!isDone() && state.getGain() == null))
+			{
+				return legacyProgress();
+			}
+			if (isDone() && !partial())
+			{
+				return String.format(Locale.ENGLISH, "Completed: %,d pts", state.getPoints());
+			}
+			int percent = (int) Math.floor(state.getFill() * 100);
+			int gain = state.getGain();
+			Integer tier = state.getTier();
+			String next = tile.getTiers() <= 1 ? "complete" : "Tier " + (tier == null ? 1 : tier + 1);
+			String toNext = String.format(Locale.ENGLISH, "%d%% to %s: +%,d pts", percent, next, gain);
+			return tier == null ? toNext
+				: String.format(Locale.ENGLISH, "Tier %d of %d: %,d pts<br>%s", tier, tile.getTiers(), state.getPoints(), toNext);
+		}
+
+		/** An older server's tooltip, without points: how far the Team is. */
+		private String legacyProgress()
 		{
 			Integer tier = state == null ? null : state.getTier();
 			String reached = tier != null && tile.getTiers() > 1 ? "Tier " + tier + " of " + tile.getTiers() : null;
@@ -281,12 +334,18 @@ class MiniBoardView extends JPanel
 				int h = getHeight();
 				g2.setColor(tile == null && !isFree() ? ColorScheme.DARKER_GRAY_COLOR.darker() : ColorScheme.DARK_GRAY_COLOR);
 				g2.fillRect(0, 0, w, h);
-				if (isDone())
+				if (partial())
+				{
+					g2.setColor(ColorScheme.PROGRESS_INPROGRESS_COLOR);
+					g2.fillRect(0, 0, w, h);
+				}
+				else if (isDone())
 				{
 					g2.setColor(ColorScheme.PROGRESS_COMPLETE_COLOR);
 					g2.fillRect(0, 0, w, h);
 				}
-				else if (state != null && state.getFill() > 0)
+				// The fill rises toward the next Tier on an open Tile and over a partial one's amber
+				if (state != null && state.getFill() > 0 && (!isDone() || partial()))
 				{
 					int filled = (int) Math.round(h * Math.min(1, state.getFill()));
 					g2.setColor(FILL);

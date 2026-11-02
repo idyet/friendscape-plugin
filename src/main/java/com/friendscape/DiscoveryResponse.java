@@ -283,8 +283,12 @@ class DiscoveryResponse
 		String state;
 		/** The highest Tier reached, from 1; null while none is. */
 		Integer tier;
-		/** 0 to 1: 1 when complete, else progress toward the next Tier. */
+		/** 0 to 1: toward the next Tier, 1 at the top Tier (older servers: 1 at any reached Tier). */
 		double fill;
+		/** Points earned; null from an older server. */
+		Integer points;
+		/** What the next Tier adds; null at the top Tier, and from an older server. */
+		Integer gain;
 	}
 
 	/**
