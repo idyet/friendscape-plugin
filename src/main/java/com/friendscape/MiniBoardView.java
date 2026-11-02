@@ -100,7 +100,14 @@ class MiniBoardView extends JPanel
 				int width = list.getWidth() > 0 ? Math.min(LABEL_WIDTH, list.getWidth() - 4) : LABEL_WIDTH;
 				String text = value == null ? ""
 					: label((DiscoveryResponse.BoardTeam) value, list.getFontMetrics(teamPicker.getFont()), width);
-				return super.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
+				Component line = super.getListCellRendererComponent(list, text, index, isSelected, cellHasFocus);
+				// The player's own Teams in the brand orange; a highlighted row keeps the selection colours
+				if (!isSelected && value != null)
+				{
+					line.setForeground(((DiscoveryResponse.BoardTeam) value).isMine()
+						? ColorScheme.BRAND_ORANGE : ColorScheme.LIGHT_GRAY_COLOR);
+				}
+				return line;
 			}
 		});
 		teamPicker.setFont(FontManager.getRunescapeSmallFont());

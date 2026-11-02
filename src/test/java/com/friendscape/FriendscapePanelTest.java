@@ -461,6 +461,21 @@ public class FriendscapePanelTest
 	}
 
 	@Test
+	public void thePlayersTeamsStandOutInTheDropdown()
+	{
+		panel.update(discovered(bingoCard()));
+		MiniBoardView board = panel.cardViews.get(0).board;
+		javax.swing.JList<DiscoveryResponse.BoardTeam> list = new javax.swing.JList<>();
+
+		Component blue = board.teamPicker.getRenderer().getListCellRendererComponent(list, board.teamPicker.getItemAt(0), 0, false, false);
+		assertEquals(ColorScheme.LIGHT_GRAY_COLOR, blue.getForeground());
+		Component red = board.teamPicker.getRenderer().getListCellRendererComponent(list, board.teamPicker.getItemAt(1), 1, false, false);
+		assertEquals(ColorScheme.BRAND_ORANGE, red.getForeground());
+		Component picked = board.teamPicker.getRenderer().getListCellRendererComponent(list, board.teamPicker.getItemAt(1), 1, true, false);
+		assertEquals(list.getSelectionForeground(), picked.getForeground());
+	}
+
+	@Test
 	public void aLongTeamNameIsCutButKeepsItsPoints()
 	{
 		String json = "{\"size\":1,\"tiles\":[],\"teams\":["
