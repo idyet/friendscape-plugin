@@ -26,6 +26,9 @@ import okhttp3.ResponseBody;
  * The only way out of the client. Every call is refused unless {@code permitted} says yes at
  * enqueue time, runs on OkHttp's dispatcher threads (never the client thread), and has its result
  * dropped if permission was withdrawn or the call cancelled while it was in flight.
+ * <p>
+ * Redirects are never followed: the API never redirects, so a redirect, an answer from another
+ * host or a non-JSON success means something on the network (a DNS filter) answered instead.
  */
 @Slf4j
 class FriendscapeApi
@@ -41,29 +44,70 @@ class FriendscapeApi
 
 	FriendscapeApi(OkHttpClient http, Gson gson, HttpUrl base, BooleanSupplier permitted)
 	{
-		this.http = http;
+		// A DNS filter redirects to its block page, whose HTML 200 would otherwise pass as an answer
+		this.http = http.newBuilder().followRedirects(false).followSslRedirects(false).build();
 		this.gson = gson;
 		this.base = base;
 		this.permitted = permitted;
 	}
 
+	/** The client calls go through, for tests. */
+	OkHttpClient client()
+	{
+		return http;
+	}
+
 	/**
-	 * Reports whether the server answered its health route. Called back on an OkHttp thread, and
-	 * not at all if the call was refused or cancelled.
+	 * Reports whether the server answered its health route: connected, unreachable or blocked.
+	 * Called back on an OkHttp thread, and not at all if the call was refused or cancelled.
 	 */
-	void checkHealth(Consumer<Boolean> onResult)
+	void checkHealth(Consumer<ConnectionStatus> onResult)
 	{
 		Request request = new Request.Builder().url(base.resolve("health")).get().build();
-		enqueue(request, response -> onResult.accept(response.isSuccessful()), error -> onResult.accept(false));
+		enqueue(request, response ->
+		{
+			if (blocked(response))
+			{
+				onResult.accept(ConnectionStatus.BLOCKED);
+				return;
+			}
+			onResult.accept(response.isSuccessful() ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE);
+		}, error -> onResult.accept(ConnectionStatus.UNREACHABLE));
+	}
+
+	/**
+	 * Whether something on the network answered for the server: a redirect, an answer from another
+	 * host, or a success that is not JSON (a block page).
+	 */
+	private boolean blocked(Response response)
+	{
+		if ((response.code() >= 300 && response.code() < 400) || !base.host().equals(response.request().url().host()))
+		{
+			return true;
+		}
+		if (!response.isSuccessful())
+		{
+			return false;
+		}
+		ResponseBody body = response.body();
+		MediaType type = body == null ? null : body.contentType();
+		return type == null || !isJson(type);
+	}
+
+	private static boolean isJson(MediaType type)
+	{
+		return "json".equals(type.subtype()) || type.subtype().endsWith("+json");
 	}
 
 	/**
 	 * Asks which Events roster the character, with each one's phase, Roster entry state and
-	 * standing. {@code onReachable} hears whether the server answered at all: a refusal (4xx) is an
-	 * answer, a server error or failed connection is not; {@code onResult} hears only a successful
-	 * answer. Both come back on an OkHttp thread, and neither for a call refused here or cancelled.
+	 * standing. {@code onConnection} hears whether the server answered at all: a refusal (4xx) is an
+	 * answer (connected), a server error or failed connection is not (unreachable), and an answer
+	 * from something on the network is blocked; {@code onResult} hears only a successful answer.
+	 * Both come back on an OkHttp thread, and neither for a call refused here or cancelled.
 	 */
-	void discover(String rsn, long accountHash, Consumer<DiscoveryResponse> onResult, Consumer<Boolean> onReachable)
+	void discover(String rsn, long accountHash, Consumer<DiscoveryResponse> onResult,
+		Consumer<ConnectionStatus> onConnection)
 	{
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/discovery"))
@@ -71,13 +115,18 @@ class FriendscapeApi
 			.build();
 		enqueue(request, response ->
 		{
-			onReachable.accept(response.code() < 500);
+			if (blocked(response))
+			{
+				onConnection.accept(ConnectionStatus.BLOCKED);
+				return;
+			}
+			onConnection.accept(response.code() < 500 ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE);
 			DiscoveryResponse parsed = parse(response, DiscoveryResponse.class);
 			if (parsed != null)
 			{
 				onResult.accept(parsed);
 			}
-		}, error -> onReachable.accept(false));
+		}, error -> onConnection.accept(ConnectionStatus.UNREACHABLE));
 	}
 
 	/** The website's page for an Event: {@code /e/<number>} on the API's host. */
@@ -324,6 +373,12 @@ class FriendscapeApi
 			.build();
 		return enqueue(request, response ->
 		{
+			// Something on the network answered, whatever its code: the server never saw the send
+			if (blocked(response))
+			{
+				callback.failed();
+				return;
+			}
 			int code = response.code();
 			// A timeout or rate limit is passing; any other 4xx would fail again
 			if (code >= 400 && code < 500 && code != 408 && code != 429)
@@ -343,9 +398,18 @@ class FriendscapeApi
 		}, error -> callback.failed());
 	}
 
-	/** The JSON body of a successful response, or null (logged) for an error status or bad body. */
+	/**
+	 * The JSON body of a successful response, or null (logged) for an error status, bad body, or an
+	 * answer from something on the network rather than the server.
+	 */
 	private <T> T parse(Response response, Class<T> type)
 	{
+		if (blocked(response))
+		{
+			log.debug("{} {} blocked by the network: answered {}", response.request().method(),
+				response.request().url(), response.code());
+			return null;
+		}
 		ResponseBody body = response.body();
 		if (!response.isSuccessful() || body == null)
 		{

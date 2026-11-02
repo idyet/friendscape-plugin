@@ -8,8 +8,9 @@ import lombok.Value;
 
 /**
  * Decides the chat lines for problems on discovered Events (SPEC 10.4): a held identity mismatch
- * (red, with the notifier) and removal from the Roster (quiet), each once per Event per session.
- * Safe to call from OkHttp threads.
+ * (red, with the notifier) and removal from the Roster (quiet), each once per Event per session, and
+ * a network blocking the server (red, with the notifier), once per session. Safe to call from
+ * OkHttp threads.
  */
 class ProblemNotices
 {
@@ -20,6 +21,9 @@ class ProblemNotices
 		/** Shown in red, with the RuneLite notifier when that is on. */
 		boolean problem;
 	}
+
+	/** Told's key for a network block; Event keys are {@code number:entry}. */
+	private static final String BLOCKED = "blocked";
 
 	private final Set<String> told = new HashSet<>();
 
@@ -48,6 +52,16 @@ class ProblemNotices
 			}
 		}
 		return notices;
+	}
+
+	/** The line for a network blocking the API's {@code host}; null when already told this session. */
+	synchronized Notice blocked(String host)
+	{
+		if (!told.add(BLOCKED))
+		{
+			return null;
+		}
+		return new Notice("Blocked by your network. Allow " + host + " in your DNS filter or router.", true);
 	}
 
 	/** A new session: every notice may show again. */

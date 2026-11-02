@@ -14,7 +14,9 @@ enum ConnectionStatus
 	WORLD_NOT_TRACKED("Not tracked on Leagues or special worlds", ColorScheme.PROGRESS_INPROGRESS_COLOR),
 	CONNECTING("Connecting", ColorScheme.LIGHT_GRAY_COLOR),
 	CONNECTED("Connected", ColorScheme.PROGRESS_COMPLETE_COLOR),
-	UNREACHABLE("Server unreachable, retrying", ColorScheme.LIGHT_GRAY_COLOR);
+	UNREACHABLE("Server unreachable, retrying", ColorScheme.LIGHT_GRAY_COLOR),
+	/** A DNS filter or router answered for the server: a problem the player can fix, not a passing outage. */
+	BLOCKED("Blocked by your network", ColorScheme.PROGRESS_ERROR_COLOR);
 
 	private final String text;
 	private final Color color;

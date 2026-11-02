@@ -537,9 +537,9 @@ public class FriendscapePlugin extends Plugin
 	}
 
 	@Schedule(period = 60, unit = ChronoUnit.SECONDS, asynchronous = true)
-	public void retryUnreachable()
+	public void retryDisconnected()
 	{
-		if (connection == ConnectionStatus.UNREACHABLE)
+		if (connection == ConnectionStatus.UNREACHABLE || connection == ConnectionStatus.BLOCKED)
 		{
 			checkHealth();
 		}
@@ -830,15 +830,28 @@ public class FriendscapePlugin extends Plugin
 			pruneStored(FriendscapeConfig.HIDDEN_STANDINGS, config.hiddenStandings(), live);
 			pruneStored(FriendscapeConfig.HIDDEN_CODEWORDS, config.hiddenCodewords(), live);
 			refreshPanel();
-		}, reachable ->
+		}, answered ->
 		{
-			ConnectionStatus answered = reachable ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE;
 			if (session.get() == sentIn && connection != answered)
 			{
-				connection = answered;
-				refreshPanel();
+				answerConnection(answered);
 			}
 		});
+	}
+
+	/** Shows the connection a call reported; a network block is told once per session (SPEC 10.4). */
+	private void answerConnection(ConnectionStatus answered)
+	{
+		connection = answered;
+		if (answered == ConnectionStatus.BLOCKED)
+		{
+			ProblemNotices.Notice notice = notices.blocked(apiBase.host());
+			if (notice != null)
+			{
+				tell(notice);
+			}
+		}
+		refreshPanel();
 	}
 
 	/** A chat line, red with the notifier for a problem (SPEC 10.4). */
@@ -995,12 +1008,19 @@ public class FriendscapePlugin extends Plugin
 		{
 			return;
 		}
-		connection = ConnectionStatus.CONNECTING;
-		refreshPanel();
-		api.checkHealth(up ->
+		// A retry while blocked keeps saying so: Connecting would flash the empty state back
+		if (connection != ConnectionStatus.BLOCKED)
 		{
-			connection = up ? ConnectionStatus.CONNECTED : ConnectionStatus.UNREACHABLE;
+			connection = ConnectionStatus.CONNECTING;
 			refreshPanel();
+		}
+		int sentIn = session.get();
+		api.checkHealth(answered ->
+		{
+			if (session.get() == sentIn)
+			{
+				answerConnection(answered);
+			}
 		});
 	}
 

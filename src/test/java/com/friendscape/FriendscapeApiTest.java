@@ -46,6 +46,12 @@ public class FriendscapeApiTest
 
 	private OkHttpClient clientAnswering(int code, String json)
 	{
+		return clientAnswering(code, "application/json", json, null);
+	}
+
+	/** Answers every call with {@code body} of {@code type}; from {@code finalUrl} when not null, as after a redirect. */
+	private OkHttpClient clientAnswering(int code, String type, String body, String finalUrl)
+	{
 		Interceptor fake = chain ->
 		{
 			requestedUrls.add(chain.request().url().toString());
@@ -57,14 +63,45 @@ public class FriendscapeApiTest
 			}
 			requestThread.set(Thread.currentThread().getName());
 			return new Response.Builder()
-				.request(chain.request())
+				.request(finalUrl == null ? chain.request() : chain.request().newBuilder().url(finalUrl).build())
 				.protocol(Protocol.HTTP_1_1)
 				.code(code)
 				.message("fake")
-				.body(ResponseBody.create(MediaType.get("application/json"), json))
+				.body(ResponseBody.create(MediaType.get(type), body))
 				.build();
 		};
 		return new OkHttpClient.Builder().addInterceptor(fake).build();
+	}
+
+	private static final String BLOCK_PAGE = "https://bpb.opendns.com/b/https/friendscape.test/api/health";
+
+	/** A DNS filter's answer: a redirect to its block page. */
+	private OkHttpClient clientRedirecting()
+	{
+		Interceptor redirect = chain ->
+		{
+			requestedUrls.add(chain.request().url().toString());
+			return new Response.Builder()
+				.request(chain.request())
+				.protocol(Protocol.HTTP_1_1)
+				.code(302)
+				.message("Found")
+				.header("Location", BLOCK_PAGE)
+				.body(ResponseBody.create(MediaType.get("text/html"), ""))
+				.build();
+		};
+		return new OkHttpClient.Builder().addInterceptor(redirect).build();
+	}
+
+	/** The block page itself, as a client that followed the redirect would get it. */
+	private OkHttpClient clientAnsweringABlockPage()
+	{
+		return clientAnswering(200, "text/html; charset=utf-8", "<html>This domain is blocked</html>", null);
+	}
+
+	private OkHttpClient clientAnsweredFromAnotherHost()
+	{
+		return clientAnswering(200, "application/json", "{\"status\":\"ok\"}", BLOCK_PAGE);
 	}
 
 	private FriendscapeApi api(OkHttpClient http)
@@ -72,13 +109,13 @@ public class FriendscapeApiTest
 		return new FriendscapeApi(http, new Gson(), BASE, permitted::get);
 	}
 
-	private Boolean checkHealth(FriendscapeApi api) throws InterruptedException
+	private ConnectionStatus checkHealth(FriendscapeApi api) throws InterruptedException
 	{
 		CountDownLatch done = new CountDownLatch(1);
-		AtomicReference<Boolean> result = new AtomicReference<>();
-		api.checkHealth(up ->
+		AtomicReference<ConnectionStatus> result = new AtomicReference<>();
+		api.checkHealth(status ->
 		{
-			result.set(up);
+			result.set(status);
 			done.countDown();
 		});
 		done.await(5, TimeUnit.SECONDS);
@@ -90,8 +127,25 @@ public class FriendscapeApiTest
 	{
 		FriendscapeApi api = api(clientAnswering(200));
 
-		assertEquals(Boolean.TRUE, checkHealth(api));
+		assertEquals(ConnectionStatus.CONNECTED, checkHealth(api));
 		assertEquals(List.of("https://friendscape.test/api/health"), requestedUrls);
+	}
+
+	@Test
+	public void theClientNeverFollowsRedirects()
+	{
+		OkHttpClient http = api(new OkHttpClient()).client();
+
+		assertFalse(http.followRedirects());
+		assertFalse(http.followSslRedirects());
+	}
+
+	@Test
+	public void healthCheckReportsBlockedOnARedirectABlockPageOrAnotherHost() throws InterruptedException
+	{
+		assertEquals(ConnectionStatus.BLOCKED, checkHealth(api(clientRedirecting())));
+		assertEquals(ConnectionStatus.BLOCKED, checkHealth(api(clientAnsweringABlockPage())));
+		assertEquals(ConnectionStatus.BLOCKED, checkHealth(api(clientAnsweredFromAnotherHost())));
 	}
 
 	@Test
@@ -99,7 +153,7 @@ public class FriendscapeApiTest
 	{
 		FriendscapeApi api = api(clientAnswering(503));
 
-		assertEquals(Boolean.FALSE, checkHealth(api));
+		assertEquals(ConnectionStatus.UNREACHABLE, checkHealth(api));
 	}
 
 	@Test
@@ -164,7 +218,7 @@ public class FriendscapeApiTest
 		CountDownLatch release = new CountDownLatch(1);
 		FriendscapeApi api = api(clientBlockingUntil(entered, release, false));
 
-		AtomicReference<Boolean> result = new AtomicReference<>();
+		AtomicReference<ConnectionStatus> result = new AtomicReference<>();
 		api.checkHealth(result::set);
 		assertTrue(entered.await(5, TimeUnit.SECONDS));
 
@@ -182,7 +236,7 @@ public class FriendscapeApiTest
 		CountDownLatch release = new CountDownLatch(1);
 		FriendscapeApi api = api(clientBlockingUntil(entered, release, true));
 
-		AtomicReference<Boolean> result = new AtomicReference<>();
+		AtomicReference<ConnectionStatus> result = new AtomicReference<>();
 		api.checkHealth(result::set);
 		assertTrue(entered.await(5, TimeUnit.SECONDS));
 
@@ -300,9 +354,9 @@ public class FriendscapeApiTest
 			json(requestBodies.get(0)));
 	}
 
-	/** Discovery's answer, or the reachability it reported: true reachable, false unreachable. */
+	/** Discovery's answer, and the connection it reported. */
 	private final AtomicReference<DiscoveryResponse> discovered = new AtomicReference<>();
-	private final AtomicReference<Boolean> reachable = new AtomicReference<>();
+	private final AtomicReference<ConnectionStatus> connection = new AtomicReference<>();
 
 	private void discover(FriendscapeApi api) throws InterruptedException
 	{
@@ -311,9 +365,9 @@ public class FriendscapeApiTest
 		{
 			discovered.set(response);
 			done.countDown();
-		}, up ->
+		}, status ->
 		{
-			reachable.set(up);
+			connection.set(status);
 			done.countDown();
 		});
 		done.await(2, TimeUnit.SECONDS);
@@ -332,7 +386,7 @@ public class FriendscapeApiTest
 		assertEquals(List.of("https://friendscape.test/api/v1/plugin/discovery"), requestedUrls);
 		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\"}"), json(requestBodies.get(0)));
 		assertEquals(5, discovered.get().getEvents().get(0).getStanding().getGain());
-		assertEquals(Boolean.TRUE, reachable.get());
+		assertEquals(ConnectionStatus.CONNECTED, connection.get());
 	}
 
 	@Test
@@ -343,7 +397,22 @@ public class FriendscapeApiTest
 		discover(api);
 
 		assertNull(discovered.get());
-		assertEquals(Boolean.FALSE, reachable.get());
+		assertEquals(ConnectionStatus.UNREACHABLE, connection.get());
+	}
+
+	@Test
+	public void discoveryReportsBlockedOnARedirectABlockPageOrAnotherHost() throws InterruptedException
+	{
+		for (OkHttpClient http : List.of(clientRedirecting(), clientAnsweringABlockPage(), clientAnsweredFromAnotherHost()))
+		{
+			discovered.set(null);
+			connection.set(null);
+
+			discover(api(http));
+
+			assertNull(discovered.get());
+			assertEquals(ConnectionStatus.BLOCKED, connection.get());
+		}
 	}
 
 	@Test
@@ -354,7 +423,7 @@ public class FriendscapeApiTest
 		discover(api);
 
 		assertNull(discovered.get());
-		assertEquals(Boolean.TRUE, reachable.get());
+		assertEquals(ConnectionStatus.CONNECTED, connection.get());
 	}
 
 	private String report(FriendscapeApi api) throws InterruptedException
@@ -518,6 +587,16 @@ public class FriendscapeApiTest
 			throw new IOException("unreachable");
 		};
 		assertEquals("failed", sendSubmission(api(new OkHttpClient.Builder().addInterceptor(down).build()), VISAGE, null));
+	}
+
+	@Test
+	public void aBlockedSubmissionFailsSoItStaysQueued() throws InterruptedException
+	{
+		assertEquals("failed", sendSubmission(api(clientAnswering(403, "text/html", "<html>Blocked</html>", BLOCK_PAGE)),
+			VISAGE, null));
+		assertEquals("failed", sendSubmission(api(clientRedirecting()), VISAGE, null));
+		assertEquals("failed", sendSubmission(api(clientAnsweringABlockPage()), VISAGE, null));
+		assertEquals("failed", sendSubmission(api(clientAnsweredFromAnotherHost()), VISAGE, null));
 	}
 
 	@Test

@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import java.util.List;
 import java.util.Set;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
@@ -70,5 +72,19 @@ public class ProblemNoticesTest
 		notices.check(discovery(111111, "held"), Set.of());
 
 		assertEquals(1, notices.check(discovery(111111, "held", 222222, "held"), Set.of()).size());
+	}
+
+	@Test
+	public void warnsOfABlockingNetworkOncePerSessionInRedNamingTheHost()
+	{
+		ProblemNotices.Notice first = notices.blocked("dev.friendscape.cc");
+
+		assertEquals("Blocked by your network. Allow dev.friendscape.cc in your DNS filter or router.", first.getText());
+		assertTrue(first.isProblem());
+		assertNull(notices.blocked("dev.friendscape.cc"));
+
+		notices.reset();
+
+		assertNotNull(notices.blocked("dev.friendscape.cc"));
 	}
 }

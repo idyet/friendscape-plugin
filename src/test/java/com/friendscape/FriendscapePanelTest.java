@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import javax.swing.JCheckBox;
 import javax.swing.JLabel;
+import net.runelite.client.ui.ColorScheme;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -293,6 +294,21 @@ public class FriendscapePanelTest
 
 		assertTrue(panel.emptyState.isVisible());
 		assertTrue(panel.emptyState.getText().contains("No Events yet. Ask your organizer to add Iron Man."));
+	}
+
+	@Test
+	public void showsBlockedInTheHeaderAndNoCardsOrEmptyStateWhileTheNetworkBlocksTheServer()
+	{
+		panel.update(discovered().toBuilder().status(ConnectionStatus.BLOCKED).build());
+
+		assertEquals("Blocked by your network", panel.statusText.getText());
+		assertEquals(ColorScheme.PROGRESS_ERROR_COLOR, panel.statusDot.getForeground());
+		assertFalse(panel.emptyState.isVisible());
+
+		panel.update(discovered(card(111111, CardState.TRACKING, List.of())).toBuilder()
+			.status(ConnectionStatus.BLOCKED).build());
+
+		assertTrue(panel.cardViews.isEmpty());
 	}
 
 	@Test

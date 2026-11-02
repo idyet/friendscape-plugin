@@ -183,9 +183,10 @@ class FriendscapePanel extends PluginPanel
 		disclosure.setVisible(!state.isSending());
 		turnOnButton.setVisible(!state.isSending());
 
-		// Cards come from discovery, which needs sending on: hide what could be stale
-		List<EventCard> shown = state.isSending() && state.getCards() != null ? state.getCards() : List.of();
-		emptyState.setVisible(state.isSending() && state.getCards() != null && shown.isEmpty());
+		// Cards come from discovery, which needs sending on and the server in reach: hide what could be stale
+		boolean fresh = state.isSending() && state.getStatus() != ConnectionStatus.BLOCKED;
+		List<EventCard> shown = fresh && state.getCards() != null ? state.getCards() : List.of();
+		emptyState.setVisible(fresh && state.getCards() != null && shown.isEmpty());
 		emptyState.setText("<html>No Events yet. Ask your organizer to add " + state.getRsn() + ".</html>");
 		byGroup = state.isByGroup();
 		groupToggle.setVisible(!shown.isEmpty());
