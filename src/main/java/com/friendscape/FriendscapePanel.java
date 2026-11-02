@@ -54,6 +54,12 @@ class FriendscapePanel extends PluginPanel
 		/** "Report to Friendscape": asks the admin to look at the card's held identity mismatch. */
 		void report(int number);
 
+		/** Report issue: opens the feedback page as a Problem with the card's Event (SPEC 6.11). */
+		void reportIssue(int number);
+
+		/** The header's Send feedback: opens the feedback page (SPEC 6.11). */
+		void sendFeedback();
+
 		/** A Team's board page, for a board too large for the card. */
 		void openBoard(int number, int teamNumber);
 
@@ -95,6 +101,7 @@ class FriendscapePanel extends PluginPanel
 	final JButton turnOnButton = new JButton("Turn on sending");
 	final JLabel emptyState = new JLabel();
 	final JToggleButton groupToggle = new JToggleButton(Glyphs.groups());
+	final JButton feedbackButton = new JButton(Glyphs.feedback());
 	final List<CardView> cardViews = new ArrayList<>();
 	/** By Group only: one per section, in panel order. */
 	final List<GroupHeader> groupHeaders = new ArrayList<>();
@@ -129,9 +136,15 @@ class FriendscapePanel extends PluginPanel
 		title.setForeground(ColorScheme.BRAND_ORANGE);
 		groupToggle.setFocusable(false);
 		groupToggle.addActionListener(e -> actions.setByGroup(!byGroup));
+		feedbackButton.setFocusable(false);
+		feedbackButton.setToolTipText("Send feedback");
+		feedbackButton.addActionListener(e -> actions.sendFeedback());
+		JPanel headerButtons = new JPanel(new BorderLayout(5, 0));
+		headerButtons.add(feedbackButton, BorderLayout.WEST);
+		headerButtons.add(groupToggle, BorderLayout.EAST);
 		JPanel titleRow = new JPanel(new BorderLayout(5, 0));
 		titleRow.add(title, BorderLayout.CENTER);
-		titleRow.add(groupToggle, BorderLayout.EAST);
+		titleRow.add(headerButtons, BorderLayout.EAST);
 
 		JPanel status = new JPanel(new BorderLayout(5, 0));
 		status.add(statusDot, BorderLayout.WEST);
@@ -384,6 +397,8 @@ class FriendscapePanel extends PluginPanel
 		final MiniBoardView board;
 		final JButton rejoinButton = new JButton("Rejoin");
 		final JButton menuButton = new JButton(Glyphs.more());
+		final JPopupMenu menu = new JPopupMenu();
+		final JMenuItem reportIssueItem = new JMenuItem("Report issue");
 		final JMenuItem leaveItem = new JMenuItem("Leave");
 		final JMenuItem standingsItem = new JMenuItem();
 		final JMenuItem codewordItem = new JMenuItem();
@@ -447,10 +462,11 @@ class FriendscapePanel extends PluginPanel
 				standing.add(label);
 			}
 
-			JPopupMenu menu = new JPopupMenu();
 			menu.add(standingsItem);
 			menu.add(codewordItem);
+			menu.add(reportIssueItem);
 			menu.add(leaveItem);
+			reportIssueItem.addActionListener(e -> actions.reportIssue(card.getNumber()));
 			// Overlay choices only mean something while the Event is in the overlays
 			standingsItem.setVisible(card.isLive());
 			standingsItem.setText(standingsHidden ? "Show standings" : "Hide standings");
@@ -460,7 +476,6 @@ class FriendscapePanel extends PluginPanel
 			codewordItem.addActionListener(e -> actions.setCodewordHidden(card.getNumber(), !codewordHidden));
 			// A Finalized Event has nothing left to mute
 			leaveItem.setVisible(!card.isLeft() && !card.isFinalized());
-			menuButton.setVisible(standingsItem.isVisible() || codewordItem.isVisible() || leaveItem.isVisible());
 			menuButton.setToolTipText("More");
 			menuButton.addActionListener(e -> menu.show(menuButton, 0, menuButton.getHeight()));
 			leaveItem.addActionListener(e ->

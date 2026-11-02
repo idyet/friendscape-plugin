@@ -48,6 +48,16 @@ final class Glyphs
 		});
 	}
 
+	/** A speech bubble: the panel's Send feedback button. */
+	static Icon feedback()
+	{
+		return new Painted(12, 12, (g, x, y) ->
+		{
+			g.fillRoundRect(x, y, 12, 9, 4, 4);
+			g.fillPolygon(new int[]{x + 2, x + 6, x + 2}, new int[]{y + 8, y + 8, y + 12}, 3);
+		});
+	}
+
 	/** A small triangle pointing down when open, right when collapsed: a Group header's state. */
 	static Icon chevron(boolean open)
 	{

@@ -3,9 +3,14 @@ package com.friendscape;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.IOException;
+import java.io.Reader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -38,6 +43,8 @@ public class FriendscapeApiTest
 	private final AtomicBoolean permitted = new AtomicBoolean(true);
 
 	private final List<String> requestBodies = new CopyOnWriteArrayList<>();
+	/** Each request's {@code X-Friendscape-Version}, "none" when absent. */
+	private final List<String> versionHeaders = new CopyOnWriteArrayList<>();
 
 	private OkHttpClient clientAnswering(int code)
 	{
@@ -55,6 +62,8 @@ public class FriendscapeApiTest
 		Interceptor fake = chain ->
 		{
 			requestedUrls.add(chain.request().url().toString());
+			String version = chain.request().header("X-Friendscape-Version");
+			versionHeaders.add(version == null ? "none" : version);
 			if (chain.request().body() != null)
 			{
 				Buffer buffer = new Buffer();
@@ -611,5 +620,53 @@ public class FriendscapeApiTest
 		assertEquals("https://friendscape.test/e/123456/upload", FriendscapeApi.uploadPage(BASE, 123456));
 		assertEquals("https://friendscape.test/e/123456/t/3", FriendscapeApi.teamPage(BASE, 123456, 3));
 		assertEquals("https://friendscape.test/e/123456/t/3?tile=12", FriendscapeApi.tilePage(BASE, 123456, 3, 12));
+	}
+
+	@Test
+	public void everyRequestCarriesThePluginVersion() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		checkHealth(api);
+		sendReadings(api, Map.of("overall", 4_600_000_000L));
+		report(api);
+		sendSubmission(api, VISAGE, null);
+
+		assertEquals(4, versionHeaders.size());
+		for (String version : versionHeaders)
+		{
+			assertEquals(FriendscapeApi.VERSION, version);
+		}
+	}
+
+	@Test
+	public void theVersionIsTheReleaseVersion() throws IOException
+	{
+		String gradle = new String(Files.readAllBytes(Paths.get("build.gradle")), StandardCharsets.UTF_8);
+		Properties properties = new Properties();
+		try (Reader reader = Files.newBufferedReader(Paths.get("runelite-plugin.properties")))
+		{
+			properties.load(reader);
+		}
+
+		assertTrue(gradle.contains("version = '" + FriendscapeApi.VERSION + "'"));
+		assertEquals(FriendscapeApi.VERSION, properties.getProperty("version"));
+	}
+
+	@Test
+	public void sendFeedbackOpensTheFeedbackPageWithRsnAndVersion()
+	{
+		assertEquals("https://friendscape.test/feedback?source=plugin-panel&rsn=Iron%20Man&v=" + FriendscapeApi.VERSION,
+			FriendscapeApi.feedbackPage(BASE, "Iron Man"));
+		assertEquals("https://friendscape.test/feedback?source=plugin-panel&v=" + FriendscapeApi.VERSION,
+			FriendscapeApi.feedbackPage(BASE, null));
+	}
+
+	@Test
+	public void reportIssueOpensAProblemWithTheEvent()
+	{
+		assertEquals("https://friendscape.test/feedback?source=plugin-card&kind=event_problem&event=123456"
+				+ "&rsn=Iron%20Man&v=" + FriendscapeApi.VERSION,
+			FriendscapeApi.reportIssuePage(BASE, 123456, "Iron Man"));
 	}
 }

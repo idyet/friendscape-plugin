@@ -239,6 +239,18 @@ public class FriendscapePlugin extends Plugin
 			}
 
 			@Override
+			public void reportIssue(int number)
+			{
+				LinkBrowser.browse(FriendscapeApi.reportIssuePage(apiBase, number, rsn));
+			}
+
+			@Override
+			public void sendFeedback()
+			{
+				LinkBrowser.browse(FriendscapeApi.feedbackPage(apiBase, rsn));
+			}
+
+			@Override
 			public void openBoard(int number, int teamNumber)
 			{
 				LinkBrowser.browse(FriendscapeApi.teamPage(apiBase, number, teamNumber));

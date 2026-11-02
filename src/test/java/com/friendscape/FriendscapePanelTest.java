@@ -51,6 +51,18 @@ public class FriendscapePanelTest
 		}
 
 		@Override
+		public void reportIssue(int number)
+		{
+			actions.add("report issue " + number);
+		}
+
+		@Override
+		public void sendFeedback()
+		{
+			actions.add("feedback");
+		}
+
+		@Override
 		public void openBoard(int number, int teamNumber)
 		{
 			actions.add("board " + number + " team " + teamNumber);
@@ -658,13 +670,14 @@ public class FriendscapePanelTest
 	}
 
 	@Test
-	public void aFinalizedCardHasNoLeaveAndNoMenu()
+	public void aFinalizedCardHasNoLeaveButStillReportIssue()
 	{
 		panel.update(discovered(finalizedCard(CardState.FINAL)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertFalse(view.leaveItem.isVisible());
-		assertFalse(view.menuButton.isVisible());
+		assertTrue(view.reportIssueItem.isVisible());
+		assertTrue(view.menuButton.isVisible());
 		assertFalse(view.rejoinButton.isVisible());
 	}
 
@@ -675,7 +688,40 @@ public class FriendscapePanelTest
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertFalse(view.rejoinButton.isVisible());
-		assertFalse(view.menuButton.isVisible());
+		assertTrue(view.reportIssueItem.isVisible());
+	}
+
+	@Test
+	public void everyCardOffersReportIssueAboveLeave()
+	{
+		for (CardState state : CardState.values())
+		{
+			panel.update(discovered(card(111111, state, List.of())));
+			FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+			assertTrue(state.name(), view.reportIssueItem.isVisible());
+			assertTrue(state.name(), view.menuButton.isVisible());
+			int report = view.menu.getComponentIndex(view.reportIssueItem);
+			assertEquals(state.name(), report + 1, view.menu.getComponentIndex(view.leaveItem));
+		}
+		assertEquals("Report issue", panel.cardViews.get(0).reportIssueItem.getText());
+
+		panel.cardViews.get(0).reportIssueItem.doClick();
+
+		assertEquals(List.of("report issue 111111"), actions);
+	}
+
+	@Test
+	public void theHeaderAlwaysOffersSendFeedback()
+	{
+		assertTrue(panel.feedbackButton.isVisible());
+		assertEquals("Send feedback", panel.feedbackButton.getToolTipText());
+
+		panel.update(discovered(card(111111, CardState.TRACKING, List.of())));
+		panel.feedbackButton.doClick();
+
+		assertTrue(panel.feedbackButton.isVisible());
+		assertEquals(List.of("feedback"), actions);
 	}
 
 	@Test

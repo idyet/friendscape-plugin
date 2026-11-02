@@ -33,6 +33,14 @@ import okhttp3.ResponseBody;
 @Slf4j
 class FriendscapeApi
 {
+	/**
+	 * The plugin's release version, sent on every request as {@link #VERSION_HEADER} (SPEC 11) and on
+	 * feedback links. Display only, never a gate; bump with {@code version} in build.gradle and
+	 * runelite-plugin.properties, which a test checks.
+	 */
+	static final String VERSION = "0.1.3";
+	static final String VERSION_HEADER = "X-Friendscape-Version";
+
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 	private static final MediaType PNG = MediaType.get("image/png");
 
@@ -151,6 +159,33 @@ class FriendscapeApi
 	static String tilePage(HttpUrl base, int number, int teamNumber, int tile)
 	{
 		return teamPageUrl(base, number, teamNumber).addQueryParameter("tile", Integer.toString(tile)).build().toString();
+	}
+
+	/** The header's Send feedback (SPEC 6.11): {@code /feedback} with the RSN, when known, and the version. */
+	static String feedbackPage(HttpUrl base, String rsn)
+	{
+		return feedbackUrl(base, "plugin-panel", null, rsn);
+	}
+
+	/** A card's Report issue: {@code /feedback} as a Problem with the card's Event. */
+	static String reportIssuePage(HttpUrl base, int number, String rsn)
+	{
+		return feedbackUrl(base, "plugin-card", number, rsn);
+	}
+
+	private static String feedbackUrl(HttpUrl base, String source, Integer number, String rsn)
+	{
+		HttpUrl.Builder url = base.newBuilder().encodedPath("/feedback").query(null)
+			.addQueryParameter("source", source);
+		if (number != null)
+		{
+			url.addQueryParameter("kind", "event_problem").addQueryParameter("event", number.toString());
+		}
+		if (rsn != null)
+		{
+			url.addQueryParameter("rsn", rsn);
+		}
+		return url.addQueryParameter("v", VERSION).build().toString();
 	}
 
 	private static HttpUrl.Builder teamPageUrl(HttpUrl base, int number, int teamNumber)
@@ -447,7 +482,8 @@ class FriendscapeApi
 			return false;
 		}
 
-		Call call = http.newCall(request);
+		// Every request, so the server sees each install's version (SPEC 11)
+		Call call = http.newCall(request.newBuilder().header(VERSION_HEADER, VERSION).build());
 		inFlight.add(call);
 		call.enqueue(new Callback()
 		{
