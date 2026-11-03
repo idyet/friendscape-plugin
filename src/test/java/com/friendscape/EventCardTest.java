@@ -532,4 +532,14 @@ public class EventCardTest
 		assertNull(card("").getLeaderboard());
 		assertNull(bingo(5, SOLO_BOARD).getLeaderboard());
 	}
+
+	@Test
+	public void skipsNullLeaderboardEntriesRatherThanFailTheCard()
+	{
+		List<EventCard.Row> rows = card("\"leaderboard\":{\"teams\":[null,"
+			+ boardTeam("Zamorak", false, 1, 300, false, false, ",\"skull\":null,\"members\":[null,"
+			+ member("Alice", 1, 120, false, false) + "],\"own\":null") + "]}").getLeaderboard();
+
+		assertEquals(List.of("1st Zamorak  +300 xp", "1st Alice  +120"), texts(rows));
+	}
 }

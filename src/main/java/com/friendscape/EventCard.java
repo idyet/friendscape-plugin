@@ -364,6 +364,11 @@ class EventCard
 		List<Row> rows = new ArrayList<>();
 		for (DiscoveryResponse.LeaderboardTeam team : event.getLeaderboard().getTeams())
 		{
+			// A broken answer's null entry is left out rather than failing the whole card
+			if (team == null)
+			{
+				continue;
+			}
 			if (team.isGap())
 			{
 				rows.add(Row.GAP);
@@ -376,6 +381,10 @@ class EventCard
 			{
 				for (DiscoveryResponse.LeaderboardMember member : team.getMembers())
 				{
+					if (member == null)
+					{
+						continue;
+					}
 					Shade shade = member.isRemoved() ? Shade.REMOVED : member.isMine() ? Shade.MINE : Shade.OTHER;
 					rows.add(new Row(false, true, ordinal(member.getRank()) + " ", orEmpty(member.getRsn()), "",
 						signed(event, member.getGain()), tooltip(event, member.getGain(), member.isRemoved(),
