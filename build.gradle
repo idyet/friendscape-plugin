@@ -60,6 +60,17 @@ tasks.register('runDev', JavaExec) {
 	systemProperty 'friendscape.apiBase', 'https://dev.friendscape.cc/api/'
 }
 
+tasks.register('runStub', JavaExec) {
+	description = 'Like run, but against a local stub API that shows every card state (test sources only)'
+	configureClientLaunch(it)
+	mainClass = 'com.friendscape.StubApi'
+	// The stub re-reads its files from the source tree, so an edit shows on the next poll
+	systemProperty 'friendscape.stubDir', file('src/test/resources/stub').absolutePath
+	if (project.hasProperty('stubPort')) {
+		systemProperty 'friendscape.stubPort', project.property('stubPort')
+	}
+}
+
 tasks.register('shadowJar', Jar) {
 	dependsOn configurations.testRuntimeClasspath
 	manifest {

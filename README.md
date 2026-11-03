@@ -73,7 +73,7 @@ This plugin submits your username, account hash, drops, kill counts, XP and scre
 
 ## Contributing
 
-Build and run instructions are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Build and run instructions are in [CONTRIBUTING.md](CONTRIBUTING.md), including how to run against a local stub API that shows every card state.
 
 ## License
 

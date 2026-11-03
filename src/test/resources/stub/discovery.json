@@ -1,0 +1,169 @@
+{
+  "events": [
+    {
+      "number": 900001,
+      "name": "Hardcore Slayer",
+      "format": "sotw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "{{rsn}}",
+          "size": 1
+        }
+      ],
+      "standing": {
+        "gain": 1200000,
+        "teams": [
+          {
+            "name": "{{rsn}}",
+            "solo": true,
+            "rank": 1,
+            "of": 6,
+            "gain": 1200000
+          }
+        ],
+        "skull": {
+          "kind": "died",
+          "at": "{{now-3h}}",
+          "best": 1200000,
+          "current": 340000
+        }
+      }
+    },
+    {
+      "number": 900002,
+      "name": "Hardcore Zulrah",
+      "format": "botw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "Team Bandos",
+          "size": 3
+        }
+      ],
+      "standing": {
+        "gain": 51,
+        "teams": [
+          {
+            "name": "Team Bandos",
+            "solo": false,
+            "rank": 2,
+            "of": 4,
+            "gain": 212
+          }
+        ],
+        "skull": {
+          "kind": "transferred",
+          "at": "{{now-1d}}",
+          "best": 51,
+          "current": 0
+        }
+      }
+    },
+    {
+      "number": 900003,
+      "name": "Hardcore Mining",
+      "format": "sotw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "{{rsn}}",
+          "size": 1
+        }
+      ],
+      "standing": {
+        "gain": 820000,
+        "teams": [
+          {
+            "name": "{{rsn}}",
+            "solo": true,
+            "rank": 2,
+            "of": 6,
+            "gain": 820000
+          }
+        ]
+      }
+    },
+    {
+      "number": 900004,
+      "name": "Hardcore Fishing",
+      "format": "sotw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "{{rsn}}",
+          "size": 1
+        }
+      ],
+      "standing": {
+        "gain": 0,
+        "teams": [
+          {
+            "name": "{{rsn}}",
+            "solo": true,
+            "rank": 6,
+            "of": 6,
+            "gain": 0
+          }
+        ]
+      },
+      "notice": {
+        "text": "Restart RuneLite to update Friendscape and take part in Hardcore Fishing.",
+        "problem": true
+      }
+    },
+    {
+      "number": 900005,
+      "name": "Plain Woodcutting",
+      "format": "sotw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "{{rsn}}",
+          "size": 1
+        }
+      ],
+      "standing": {
+        "gain": 15000,
+        "teams": [
+          {
+            "name": "{{rsn}}",
+            "solo": true,
+            "rank": 3,
+            "of": 6,
+            "gain": 15000
+          }
+        ]
+      },
+      "notice": {
+        "text": "[stub] Plain notice, problem false.",
+        "problem": false
+      }
+    }
+  ]
+}
