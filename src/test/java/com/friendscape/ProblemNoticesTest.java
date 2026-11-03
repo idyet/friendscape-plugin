@@ -12,6 +12,8 @@ import org.junit.Test;
 public class ProblemNoticesTest
 {
 	private static final Gson GSON = new Gson();
+	private static final String RESTART_TEXT = "Restart RuneLite to update Friendscape and take part in Event 111111.";
+	private static final String RESTART = "{\"text\":\"" + RESTART_TEXT + "\",\"problem\":true}";
 
 	private final ProblemNotices notices = new ProblemNotices();
 
@@ -72,6 +74,54 @@ public class ProblemNoticesTest
 		notices.check(discovery(111111, "held"), Set.of());
 
 		assertEquals(1, notices.check(discovery(111111, "held", 222222, "held"), Set.of()).size());
+	}
+
+	/** One Live Event carrying the server's {@code notice} JSON. */
+	private static DiscoveryResponse withNotice(int number, String entry, String notice)
+	{
+		return GSON.fromJson("{\"events\":[{\"number\":" + number + ",\"name\":\"Event " + number
+			+ "\",\"phase\":\"live\",\"entry\":\"" + entry + "\",\"notice\":" + notice + "}]}", DiscoveryResponse.class);
+	}
+
+	private static DiscoveryResponse withNotice(int number, String notice)
+	{
+		return withNotice(number, "on_roster", notice);
+	}
+
+	@Test
+	public void showsAServerNoticeOncePerEventPerSession()
+	{
+		List<ProblemNotices.Notice> first = notices.check(withNotice(111111, RESTART), Set.of());
+
+		assertEquals(List.of(new ProblemNotices.Notice(RESTART_TEXT, true)), first);
+		assertTrue(notices.check(withNotice(111111, RESTART), Set.of()).isEmpty());
+		assertEquals(1, notices.check(withNotice(222222, RESTART), Set.of()).size());
+
+		notices.reset();
+
+		assertEquals(1, notices.check(withNotice(111111, RESTART), Set.of()).size());
+	}
+
+	@Test
+	public void showsAServerNoticeQuietlyWhenNotAProblem()
+	{
+		List<ProblemNotices.Notice> told = notices.check(withNotice(111111, "{\"text\":\"Hello.\"}"), Set.of());
+
+		assertEquals(List.of(new ProblemNotices.Notice("Hello.", false)), told);
+	}
+
+	@Test
+	public void showsNoServerNoticeWhenAbsentTextlessOrLeft()
+	{
+		assertTrue(notices.check(withNotice(111111, "null"), Set.of()).isEmpty());
+		assertTrue(notices.check(withNotice(111111, "{\"problem\":true}"), Set.of()).isEmpty());
+		assertTrue(notices.check(withNotice(111111, RESTART), Set.of(111111)).isEmpty());
+	}
+
+	@Test
+	public void showsAServerNoticeBesideAHeldMismatch()
+	{
+		assertEquals(2, notices.check(withNotice(111111, "held", RESTART), Set.of()).size());
 	}
 
 	@Test

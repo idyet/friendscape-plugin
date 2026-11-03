@@ -77,6 +77,11 @@ class DiscoveryResponse
 		String codeword;
 		/** The Group the Event came from; null when made outside one, and from older servers. */
 		Group group;
+		/**
+		 * A line from the server's fixed set (SPEC 10.4), such as a plugin too old for the Event; null
+		 * otherwise, and from older servers.
+		 */
+		ProblemNotices.Notice notice;
 	}
 
 	/** The Group an Event came from, for the panel's By Group view (SPEC 10.3). */

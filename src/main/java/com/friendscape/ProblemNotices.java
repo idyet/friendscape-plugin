@@ -8,9 +8,9 @@ import lombok.Value;
 
 /**
  * Decides the chat lines for problems on discovered Events (SPEC 10.4): a held identity mismatch
- * (red, with the notifier) and removal from the Roster (quiet), each once per Event per session, and
- * a network blocking the server (red, with the notifier), once per session. Safe to call from
- * OkHttp threads.
+ * (red, with the notifier), removal from the Roster (quiet) and a server notice (red with the
+ * notifier when the server marks it a problem), each once per Event per session, and a network
+ * blocking the server (red, with the notifier), once per session. Safe to call from OkHttp threads.
  */
 class ProblemNotices
 {
@@ -22,7 +22,7 @@ class ProblemNotices
 		boolean problem;
 	}
 
-	/** Told's key for a network block; Event keys are {@code number:entry}. */
+	/** Told's key for a network block; Event keys are {@code number:entry} and {@code number:notice}. */
 	private static final String BLOCKED = "blocked";
 
 	private final Set<String> told = new HashSet<>();
@@ -49,6 +49,11 @@ class ProblemNotices
 			else if (DiscoveryResponse.REMOVED.equals(entry) && told.add(event.getNumber() + ":" + entry))
 			{
 				notices.add(new Notice("You are no longer on the roster for " + event.getName() + ".", false));
+			}
+			Notice notice = event.getNotice();
+			if (notice != null && notice.getText() != null && told.add(event.getNumber() + ":notice"))
+			{
+				notices.add(notice);
 			}
 		}
 		return notices;
