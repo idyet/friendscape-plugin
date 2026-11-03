@@ -4,7 +4,6 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import java.io.IOException;
 import java.io.Reader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.EnumSet;
@@ -680,14 +679,12 @@ public class FriendscapeApiTest
 	@Test
 	public void theVersionIsTheReleaseVersion() throws IOException
 	{
-		String gradle = new String(Files.readAllBytes(Paths.get("build.gradle")), StandardCharsets.UTF_8);
 		Properties properties = new Properties();
 		try (Reader reader = Files.newBufferedReader(Paths.get("runelite-plugin.properties")))
 		{
 			properties.load(reader);
 		}
 
-		assertTrue(gradle.contains("version = '" + FriendscapeApi.VERSION + "'"));
 		assertEquals(FriendscapeApi.VERSION, properties.getProperty("version"));
 	}
 

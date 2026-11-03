@@ -35,10 +35,10 @@ class FriendscapeApi
 {
 	/**
 	 * The plugin's release version, sent on every request as {@link #VERSION_HEADER} (SPEC 11) and on
-	 * feedback links. Display only, never a gate; bump with {@code version} in build.gradle and
-	 * runelite-plugin.properties, which a test checks.
+	 * feedback links. Display only, never a gate; bump {@code version} in runelite-plugin.properties,
+	 * which build.gradle generates {@link BuildInfo} from.
 	 */
-	static final String VERSION = "0.1.3";
+	static final String VERSION = BuildInfo.VERSION;
 	static final String VERSION_HEADER = "X-Friendscape-Version";
 	/**
 	 * The payload protocol, sent on every request as {@link #PROTOCOL_HEADER} (SPEC 11). Unlike
