@@ -18,6 +18,22 @@ public class WorldFilterTest
 	}
 
 	@Test
+	public void tracksHardcoreMainWorlds()
+	{
+		// Hardcore Main Events count only these (SPEC 5.7)
+		assertTrue(WorldFilter.isTracked(EnumSet.of(WorldType.MEMBERS, WorldType.HARDCORE_MAIN)));
+	}
+
+	@Test
+	public void hardcoreOnlyOnAHardcoreMainWorld()
+	{
+		assertTrue(WorldFilter.isHardcore(EnumSet.of(WorldType.MEMBERS, WorldType.HARDCORE_MAIN)));
+		assertFalse(WorldFilter.isHardcore(EnumSet.of(WorldType.MEMBERS)));
+		assertFalse(WorldFilter.isHardcore(EnumSet.noneOf(WorldType.class)));
+		assertFalse(WorldFilter.isHardcore(null));
+	}
+
+	@Test
 	public void excludesLeagues()
 	{
 		assertFalse(WorldFilter.isTracked(EnumSet.of(WorldType.MEMBERS, WorldType.SEASONAL)));

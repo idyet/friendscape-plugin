@@ -36,6 +36,7 @@ import net.runelite.api.Client;
 import net.runelite.api.GameState;
 import net.runelite.api.Player;
 import net.runelite.api.Skill;
+import net.runelite.api.WorldType;
 import net.runelite.api.events.ChatMessage;
 import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
@@ -160,6 +161,8 @@ public class FriendscapePlugin extends Plugin
 	// Written on the client thread, read by the API gate on OkHttp threads and by the scheduler.
 	private volatile boolean loggedIn;
 	private volatile boolean worldTracked;
+	/** The World bit (SPEC 5.7) every Reading carries, recomputed with {@link #worldTracked}. */
+	private volatile boolean worldHardcore;
 	private volatile String rsn;
 	private volatile long accountHash;
 	private volatile ConnectionStatus connection = ConnectionStatus.CONNECTING;
@@ -384,6 +387,7 @@ public class FriendscapePlugin extends Plugin
 		codewordOverlays.close();
 		loggedIn = false;
 		worldTracked = false;
+		worldHardcore = false;
 		rsn = null;
 		connection = ConnectionStatus.CONNECTING;
 		resetReadings();
@@ -677,7 +681,9 @@ public class FriendscapePlugin extends Plugin
 		// LOGGED_IN also fires after every loading screen, so only ping when the connection is unknown
 		boolean wasLoggedIn = loggedIn;
 		loggedIn = true;
-		worldTracked = WorldFilter.isTracked(client.getWorldType());
+		Set<WorldType> worldTypes = client.getWorldType();
+		worldTracked = WorldFilter.isTracked(worldTypes);
+		worldHardcore = WorldFilter.isHardcore(worldTypes);
 		if (!wasLoggedIn || connection != ConnectionStatus.CONNECTED)
 		{
 			checkHealth();
@@ -762,7 +768,7 @@ public class FriendscapePlugin extends Plugin
 		DiscoveryResponse found = discovery;
 		Set<Integer> muted = found == null ? Set.of() : found.muted(left());
 		int sentIn = session.get();
-		api.sendReadings(name, accountHash, xp, kcChat, moments, muted, response ->
+		api.sendReadings(name, accountHash, worldHardcore, xp, kcChat, moments, muted, response ->
 		{
 			if (session.get() != sentIn)
 			{

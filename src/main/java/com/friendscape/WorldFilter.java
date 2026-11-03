@@ -6,7 +6,8 @@ import net.runelite.api.WorldType;
 
 /**
  * Decides whether progress on a world counts for Events. Leagues and other special worlds run on
- * separate characters or temporary progress, so nothing from them is ever sent.
+ * separate characters or temporary progress, so nothing from them is ever sent. Hardcore Main
+ * worlds are tracked, and their Readings carry the World bit (SPEC 5.7).
  */
 final class WorldFilter
 {
@@ -40,5 +41,11 @@ final class WorldFilter
 			}
 		}
 		return true;
+	}
+
+	/** The World bit (SPEC 5.7): a Hardcore Main world, where a character has one life. */
+	static boolean isHardcore(Set<WorldType> worldTypes)
+	{
+		return worldTypes != null && worldTypes.contains(WorldType.HARDCORE_MAIN);
 	}
 }

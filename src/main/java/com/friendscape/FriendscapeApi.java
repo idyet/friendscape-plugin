@@ -40,6 +40,13 @@ class FriendscapeApi
 	 */
 	static final String VERSION = "0.1.3";
 	static final String VERSION_HEADER = "X-Friendscape-Version";
+	/**
+	 * The payload protocol, sent on every request as {@link #PROTOCOL_HEADER} (SPEC 11). Unlike
+	 * {@link #VERSION}, the server gates on it: bump by hand only when a payload gains a field the
+	 * server must tell apart from its absence. 2: Readings carry {@code hardcore}.
+	 */
+	static final int PROTOCOL = 2;
+	static final String PROTOCOL_HEADER = "X-Friendscape-Protocol";
 
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 	private static final MediaType PNG = MediaType.get("image/png");
@@ -206,15 +213,17 @@ class FriendscapeApi
 	/**
 	 * Sends absolute skill XP by skill slug and lifetime KC by the name chat uses for it (the server
 	 * maps names to activities), either of which may be empty. Marked as the start or end Reading
-	 * for {@code moments}.
+	 * for {@code moments}. {@code hardcore} is the World bit: captured on a Hardcore Main world.
 	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
 	 * a total that covers it. {@code muted} holds the numbers of the Events left on this install. The server's
 	 * answer comes back on an OkHttp thread; nothing comes back for a failed or refused send.
 	 */
-	void sendReadings(String rsn, long accountHash, Map<String, Long> xp, Map<String, Long> kcChat,
-		Set<Moment> moments, Set<Integer> muted, Consumer<ReadingsResponse> onResult)
+	void sendReadings(String rsn, long accountHash, boolean hardcore, Map<String, Long> xp,
+		Map<String, Long> kcChat, Set<Moment> moments, Set<Integer> muted,
+		Consumer<ReadingsResponse> onResult)
 	{
 		Map<String, Object> body = identity(rsn, accountHash);
+		body.put("hardcore", hardcore);
 		if (!xp.isEmpty())
 		{
 			body.put("xp", xp);
@@ -482,8 +491,11 @@ class FriendscapeApi
 			return false;
 		}
 
-		// Every request, so the server sees each install's version (SPEC 11)
-		Call call = http.newCall(request.newBuilder().header(VERSION_HEADER, VERSION).build());
+		// Every request, so the server sees each install's version and protocol (SPEC 11)
+		Call call = http.newCall(request.newBuilder()
+			.header(VERSION_HEADER, VERSION)
+			.header(PROTOCOL_HEADER, Integer.toString(PROTOCOL))
+			.build());
 		inFlight.add(call);
 		call.enqueue(new Callback()
 		{
