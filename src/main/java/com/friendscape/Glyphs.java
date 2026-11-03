@@ -3,7 +3,10 @@ package com.friendscape;
 import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.RenderingHints;
+import java.awt.geom.Area;
+import java.awt.geom.Ellipse2D;
 import javax.swing.Icon;
 
 /**
@@ -71,6 +74,22 @@ final class Glyphs
 			{
 				g.fillPolygon(new int[]{x + 2, x + 6, x + 2}, new int[]{y, y + 4, y + 8}, 3);
 			}
+		});
+	}
+
+	/** A skull: a Hardcore death on the standing line (SPEC 5.7). */
+	static Icon skull()
+	{
+		return new Painted(10, 11, (g, x, y) ->
+		{
+			Area skull = new Area(new Ellipse2D.Float(x, y, 10, 8));
+			skull.add(new Area(new Rectangle(x + 2, y + 6, 6, 5)));
+			// Eye sockets and the gaps between the teeth, cut out so the card shows through
+			skull.subtract(new Area(new Ellipse2D.Float(x + 2, y + 3, 2, 3)));
+			skull.subtract(new Area(new Ellipse2D.Float(x + 6, y + 3, 2, 3)));
+			skull.subtract(new Area(new Rectangle(x + 4, y + 9, 1, 2)));
+			skull.subtract(new Area(new Rectangle(x + 6, y + 9, 1, 2)));
+			g.fill(skull);
 		});
 	}
 

@@ -53,6 +53,22 @@ class EventCard
 	/** The Group the Event came from; null when none, or from an older server. */
 	@With
 	DiscoveryResponse.Group group;
+	/** The Hardcore death skull on a standing line; null without one (SPEC 5.7). */
+	Skull skull;
+
+	/** A skull by the player's standing line, with the current Life's gain under it (SPEC 5.7). */
+	@Value
+	static class Skull
+	{
+		/** The standing line it marks: the player's own gain, or their solo line. */
+		int line;
+		/** "Died 2 Nov 14:05. Showing best life." */
+		String tooltip;
+		/** "current life: 340K". */
+		String current;
+		/** The current Life's full figure for an XP gain shown short (SPEC 6.8), else the tooltip. */
+		String currentTooltip;
+	}
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
 	@Value
@@ -79,6 +95,7 @@ class EventCard
 		List<String> standing = List.of();
 		String gainTooltip = null;
 		String rank = "";
+		Skull skull = null;
 		if (bingo && started(event))
 		{
 			standing = bingoStanding(board);
@@ -89,6 +106,7 @@ class EventCard
 			standing = standing(event);
 			gainTooltip = gainTooltip(event);
 			rank = rank(event.getStanding());
+			skull = skull(event, zone);
 		}
 		boolean upload = (state == CardState.ATTENTION && event.getNeedsEvidence() > 0) || queued.getPushedOut() > 0;
 		boolean report = state == CardState.ATTENTION && DiscoveryResponse.HELD.equals(event.getEntry());
@@ -97,7 +115,7 @@ class EventCard
 		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
 			gainTooltip, notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
 			state == CardState.VOTING ? event.getVote() : null, DiscoveryResponse.FINALIZED.equals(event.getPhase()),
-			live ? event.getCodeword() : null, event.getGroup());
+			live ? event.getCodeword() : null, event.getGroup(), skull);
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */
@@ -268,6 +286,27 @@ class EventCard
 		return lines;
 	}
 
+	/** On the own gain line when there is one, else on the solo line, which comes first. */
+	private static Skull skull(DiscoveryResponse.DiscoveredEvent event, ZoneId zone)
+	{
+		DiscoveryResponse.Standing standing = event.getStanding();
+		DiscoveryResponse.Skull skull = standing.getSkull();
+		if (skull == null)
+		{
+			return null;
+		}
+		Instant at = DiscoveryResponse.parse(event, skull.getAt());
+		String when = at == null ? "" : " " + STARTS.format(at.atZone(zone));
+		String tooltip = DiscoveryResponse.Skull.TRANSFERRED.equals(skull.getKind())
+			? "Transferred" + when + ". Final is best life."
+			: "Died" + when + ". Showing best life.";
+		long current = skull.getCurrent();
+		String full = String.format(Locale.ENGLISH, "%,d", current);
+		boolean xp = tracksXp(event);
+		return new Skull(ownGainLine(standing) ? standing.getTeams().size() : 0, tooltip,
+			"current life: " + (xp ? shortAmount(current) : full), xp ? full + " xp" : tooltip);
+	}
+
 	private static String rank(DiscoveryResponse.Standing standing)
 	{
 		if (standing.getTeams().isEmpty())
@@ -283,11 +322,17 @@ class EventCard
 		return String.format(Locale.ENGLISH, "+%,d %s", gain, unit);
 	}
 
-	/** RuneLite's stack form, "+13M xp"; one skill's gain fits an int, the clamp is only defensive. */
+	/** RuneLite's stack form, "+13M xp". */
 	private static String shortGain(long gain)
 	{
-		int clamped = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, gain));
-		return (clamped < 0 ? "" : "+") + QuantityFormatter.quantityToRSDecimalStack(clamped) + " xp";
+		return (gain < 0 ? "" : "+") + shortAmount(gain) + " xp";
+	}
+
+	/** "13M"; one skill's gain fits an int, the clamp is only defensive. */
+	private static String shortAmount(long amount)
+	{
+		int clamped = (int) Math.max(Integer.MIN_VALUE, Math.min(Integer.MAX_VALUE, amount));
+		return QuantityFormatter.quantityToRSDecimalStack(clamped);
 	}
 
 	/** 1st, 2nd, 3rd, 4th, ..., 11th, 12th, 13th, 21st. */

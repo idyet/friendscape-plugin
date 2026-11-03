@@ -10,6 +10,7 @@ import javax.swing.JLabel;
 import net.runelite.client.ui.ColorScheme;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
@@ -115,7 +116,7 @@ public class FriendscapePanelTest
 	{
 		boolean live = state == CardState.TRACKING || state == CardState.ATTENTION;
 		return new EventCard(number, "Event " + number, state, "detail " + number, standing, null, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null, null);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -341,7 +342,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), null, List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null)));
+			List.of("1st of 2, +5 xp"), null, List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null, null)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -352,7 +353,7 @@ public class FriendscapePanelTest
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.TRACKING, "Tracking",
 			List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start"), "+13,034,431 xp",
 			List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null,
-			null)));
+			null, null)));
 
 		Component[] lines = panel.cardViews.get(0).standing.getComponents();
 		assertNull(((JLabel) lines[0]).getToolTipText());
@@ -361,10 +362,37 @@ public class FriendscapePanelTest
 	}
 
 	@Test
+	public void showsTheSkullOnItsLineWithTheCurrentLifeUnderIt()
+	{
+		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.TRACKING, "Tracking",
+			List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start"), "+13,034,431 xp",
+			List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null,
+			null, new EventCard.Skull(1, "Died 2 Nov 14:05. Showing best life.", "current life: 340K",
+				"340,123 xp"))));
+
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+		assertEquals(List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start", "current life: 340K",
+			"3 waiting to send"), view.standingTexts());
+		Component[] lines = view.standing.getComponents();
+		assertNull(((JLabel) lines[0]).getIcon());
+		assertNotNull(((JLabel) lines[1]).getIcon());
+		assertEquals("+13,034,431 xp. Died 2 Nov 14:05. Showing best life.", ((JLabel) lines[1]).getToolTipText());
+		assertEquals("340,123 xp", ((JLabel) lines[2]).getToolTipText());
+	}
+
+	@Test
+	public void showsNoSkullWithoutOne()
+	{
+		panel.update(discovered(card(111111, CardState.TRACKING, List.of("1st of 2, +5 xp"))));
+
+		assertNull(((JLabel) panel.cardViews.get(0).standing.getComponents()[0]).getIcon());
+	}
+
+	@Test
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null)));
+			List.of(), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -381,7 +409,7 @@ public class FriendscapePanelTest
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION,
 			"On hold while Friendscape checks this RSN", List.of(), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
-			false, true, true, null, false, null, null)));
+			false, true, true, null, false, null, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.reportButton.isVisible());
@@ -408,7 +436,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			null, List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null);
+			null, List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null, null);
 	}
 
 	/** A drawn bingo card around a board given as discovery JSON. */
@@ -416,7 +444,7 @@ public class FriendscapePanelTest
 	{
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(boardJson, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null, List.of(), "",
-			board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null);
+			board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null, null);
 	}
 
 	@Test
@@ -512,7 +540,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null, List.of(),
-			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null, null)));
+			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);
@@ -666,7 +694,7 @@ public class FriendscapePanelTest
 	private static EventCard finalizedCard(CardState state)
 	{
 		return new EventCard(111111, "Event 111111", state, "Final", List.of(), null, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null, null, null);
 	}
 
 	@Test
@@ -738,7 +766,7 @@ public class FriendscapePanelTest
 	{
 		return new EventCard(card.getNumber(), card.getName(), card.getState(), card.getDetail(), card.getStanding(),
 			card.getGainTooltip(), card.getNotes(), card.getRank(), card.getBoard(), card.getLink(), card.isUpload(), card.isReport(),
-			card.isLive(), card.getVote(), card.isFinalized(), codeword, card.getGroup());
+			card.isLive(), card.getVote(), card.isFinalized(), codeword, card.getGroup(), card.getSkull());
 	}
 
 	@Test
@@ -829,7 +857,7 @@ public class FriendscapePanelTest
 			+ "\"choice\":" + choice + "}";
 		DiscoveryResponse.Vote vote = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Vote.class);
 		return new EventCard(333333, "Skill of the week #1", CardState.VOTING, "Voting, closes 5 Nov 18:00", List.of(),
-			null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null, null);
+			null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null, null, null);
 	}
 
 	@Test

@@ -26,7 +26,7 @@ public class CardGroupsTest
 	{
 		boolean live = state == CardState.TRACKING || state == CardState.ATTENTION;
 		return new EventCard(number, "Event " + number, state, "", List.of(), null, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, live, vote, false, null, group);
+			EventCard.OPEN_EVENT_PAGE, false, false, live, vote, false, null, group, null);
 	}
 
 	private static final DiscoveryResponse.Group IRON = new DiscoveryResponse.Group(300000, "iron clan");
@@ -89,7 +89,7 @@ public class CardGroupsTest
 			card(2, CardState.TRACKING, IRON))).get(0).urgent());
 		// Scheduled shows Tracking too, but nothing runs yet
 		EventCard scheduled = new EventCard(1, "Event 1", CardState.TRACKING, "", List.of(), null, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, false, null, false, null, IRON);
+			EventCard.OPEN_EVENT_PAGE, false, false, false, null, false, null, IRON, null);
 		assertNull(CardGroups.of(List.of(scheduled, card(2, CardState.LEFT, IRON))).get(0).urgent());
 	}
 

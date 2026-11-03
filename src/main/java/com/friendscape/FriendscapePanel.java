@@ -443,15 +443,27 @@ class FriendscapePanel extends PluginPanel
 			standing.setOpaque(false);
 			standing.setAlignmentX(LEFT_ALIGNMENT);
 			List<String> standingLines = card.getStanding();
+			EventCard.Skull skull = card.getSkull();
 			for (int i = 0; i < standingLines.size(); i++)
 			{
 				JLabel label = new JLabel(standingLines.get(i));
 				label.setFont(FontManager.getRunescapeSmallFont());
 				label.setForeground(card.isLeft() ? ColorScheme.MEDIUM_GRAY_COLOR : ColorScheme.LIGHT_GRAY_COLOR);
-				if (i == standingLines.size() - 1)
+				String tooltip = i == standingLines.size() - 1 ? card.getGainTooltip() : null;
+				if (skull != null && i == skull.getLine())
 				{
-					label.setToolTipText(card.getGainTooltip());
+					label.setIcon(Glyphs.skull());
+					label.setToolTipText(tooltip == null ? skull.getTooltip() : tooltip + ". " + skull.getTooltip());
+					standing.add(label);
+					// The current Life's gain, small beside the best Life's (SPEC 5.7)
+					JLabel current = new JLabel(skull.getCurrent());
+					current.setFont(FontManager.getRunescapeSmallFont());
+					current.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+					current.setToolTipText(skull.getCurrentTooltip());
+					standing.add(current);
+					continue;
 				}
+				label.setToolTipText(tooltip);
 				standing.add(label);
 			}
 			for (String line : card.getNotes())

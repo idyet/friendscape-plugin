@@ -331,6 +331,27 @@ class DiscoveryResponse
 		long gain;
 		/** Each of the player's Teams, best first. */
 		List<TeamStanding> teams;
+		/**
+		 * A Hardcore Main Event's death while the current Life trails the best (SPEC 5.7); null
+		 * otherwise, and from older servers.
+		 */
+		Skull skull;
+	}
+
+	/** A Hardcore death on the standing: the skull by the player's name (SPEC 5.7). */
+	@Value
+	static class Skull
+	{
+		static final String TRANSFERRED = "transferred";
+
+		/** {@code died} or {@code transferred}. */
+		String kind;
+		/** When the Reading that showed the death was captured. */
+		String at;
+		/** The best Life's gain: the standing's own gain. */
+		long best;
+		/** The current Life's gain. */
+		long current;
 	}
 
 	@Value

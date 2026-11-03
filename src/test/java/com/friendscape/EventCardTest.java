@@ -124,6 +124,77 @@ public class EventCardTest
 		assertNull(card.getGainTooltip());
 	}
 
+	private static final String DIED = "\"skull\":{\"kind\":\"died\",\"at\":\"2026-11-02T14:05:00.000Z\","
+		+ "\"best\":1204000,\"current\":340000}";
+
+	/** A Hardcore Main standing, on Team Bandos unless {@code solo}, with {@code skull} added. */
+	private static EventCard hardcore(boolean solo, String skull)
+	{
+		String team = solo
+			? "{\"name\":\"Iron Man\",\"solo\":true,\"rank\":1,\"of\":12,\"gain\":1204000}"
+			: "{\"name\":\"Team Bandos\",\"solo\":false,\"rank\":2,\"of\":4,\"gain\":3000000}";
+		return card("\"standing\":{\"gain\":1204000,\"teams\":[" + team + "]" + (skull.isEmpty() ? "" : "," + skull)
+			+ "}");
+	}
+
+	@Test
+	public void putsTheSkullOnTheOwnGainLineWithTheCurrentLifeBesideIt()
+	{
+		EventCard card = hardcore(false, DIED);
+
+		assertEquals(List.of("Team Bandos: 2nd of 4, +3,000,000 xp", "+1.2M xp since start"),
+			card.getStanding());
+		assertEquals(1, card.getSkull().getLine());
+		assertEquals("current life: 340K", card.getSkull().getCurrent());
+		assertEquals("340,000 xp", card.getSkull().getCurrentTooltip());
+		assertEquals("Died 2 Nov 14:05. Showing best life.", card.getSkull().getTooltip());
+	}
+
+	@Test
+	public void putsTheSkullOnASoloStandingLine()
+	{
+		EventCard card = hardcore(true, DIED);
+
+		assertEquals(List.of("1st of 12, +1,204,000 xp"), card.getStanding());
+		assertEquals(0, card.getSkull().getLine());
+	}
+
+	@Test
+	public void saysTransferredForATransferredCharacter()
+	{
+		EventCard card = hardcore(true, DIED.replace("died", "transferred"));
+
+		assertEquals("Transferred 2 Nov 14:05. Final is best life.", card.getSkull().getTooltip());
+	}
+
+	@Test
+	public void showsTheCurrentLifeInFullForKc()
+	{
+		EventCard card = card("\"format\":\"botw\",\"standing\":{\"gain\":51,"
+			+ "\"teams\":[{\"name\":\"Iron Man\",\"solo\":true,\"rank\":1,\"of\":12,\"gain\":51}],"
+			+ "\"skull\":{\"kind\":\"died\",\"at\":\"2026-11-02T14:05:00.000Z\",\"best\":51,\"current\":1204}}");
+
+		assertEquals("current life: 1,204", card.getSkull().getCurrent());
+		assertEquals("Died 2 Nov 14:05. Showing best life.", card.getSkull().getCurrentTooltip());
+	}
+
+	@Test
+	public void leavesTheTimeOutOfAnUnreadableDeath()
+	{
+		EventCard card = hardcore(true, DIED.replace("2026-11-02T14:05:00.000Z", "soon"));
+
+		assertEquals("Died. Showing best life.", card.getSkull().getTooltip());
+	}
+
+	@Test
+	public void showsNoSkullWithoutTheSkullFields()
+	{
+		assertNull(hardcore(true, "").getSkull());
+		assertNull(hardcore(true, "\"skull\":null").getSkull());
+		assertNull(card("").getSkull());
+		assertNull(card("\"phase\":\"scheduled\"," + "\"standing\":{\"gain\":0,\"teams\":[]," + DIED + "}").getSkull());
+	}
+
 	@Test
 	public void hasNoGainTooltipWithoutAnOwnGainLine()
 	{
