@@ -61,6 +61,8 @@ class DiscoveryResponse
 		List<TeamSize> teams;
 		/** Null without a metric, or while no Team counts the entry. */
 		Standing standing;
+		/** A started metric Event's Leaderboard, trimmed for the player; null otherwise, and from older servers. */
+		Leaderboard leaderboard;
 		/** The player's Submissions here still waiting for a screenshot; absent from older servers. */
 		int needsEvidence;
 		/** What Tiles open for the player's Teams look for; null when nothing is open. */
@@ -354,6 +356,61 @@ class DiscoveryResponse
 		long current;
 	}
 
+	/** A metric card's Leaderboard (SPEC 10.3): the server trims it, the card only draws it. */
+	@Value
+	static class Leaderboard
+	{
+		/** In standings order. */
+		List<LeaderboardTeam> teams;
+	}
+
+	@Value
+	static class LeaderboardTeam
+	{
+		/** The Team name, or for a Team of one its player's RSN. */
+		String name;
+		boolean solo;
+		int rank;
+		/** How many Teams the Event ranks. */
+		int of;
+		long gain;
+		/** The player is on it. */
+		boolean mine;
+		/** Rows are left out before this one. */
+		boolean gap;
+		/** A Team of one's player's skull; null otherwise. */
+		Skull skull;
+		/** The Team's top 3 contributors; empty on a Team of one. */
+		List<LeaderboardMember> members;
+		/** The player's own line when outside the Team's top 3; null otherwise. */
+		LeaderboardOwn own;
+	}
+
+	@Value
+	static class LeaderboardMember
+	{
+		String rsn;
+		/** Within the Team. */
+		int rank;
+		long gain;
+		boolean mine;
+		/** Taken off the Roster, still counted. */
+		boolean removed;
+		Skull skull;
+	}
+
+	/** The player's place within a Team they are outside the top 3 of. */
+	@Value
+	static class LeaderboardOwn
+	{
+		String rsn;
+		int rank;
+		/** How many members the Team ranks. */
+		int of;
+		long gain;
+		Skull skull;
+	}
+
 	@Value
 	static class TeamStanding
 	{
@@ -503,6 +560,17 @@ class DiscoveryResponse
 			return true;
 		}
 		return false;
+	}
+
+	/** Every discovered Event: those whose card choices, such as an open Leaderboard, are kept. */
+	Set<Integer> discoveredNumbers()
+	{
+		Set<Integer> numbers = new TreeSet<>();
+		for (DiscoveredEvent event : events())
+		{
+			numbers.add(event.getNumber());
+		}
+		return numbers;
 	}
 
 	/**

@@ -15,6 +15,8 @@ public interface FriendscapeConfig extends Config
 	String LEFT_EVENTS = "leftEvents";
 	/** Numbers of Events whose mini board the player closed (see {@link StoredEventNumbers}). */
 	String CLOSED_BOARDS = "closedBoards";
+	/** Numbers of Events whose Leaderboard the player opened (see {@link StoredEventNumbers}). */
+	String OPEN_LEADERBOARDS = "openLeaderboards";
 	/** Numbers of Live Events left out of the standings overlay (see {@link StoredEventNumbers}). */
 	String HIDDEN_STANDINGS = "hiddenStandings";
 	/** Numbers of Live Events whose Codeword overlay the player hid (see {@link StoredEventNumbers}). */
@@ -166,6 +168,17 @@ public interface FriendscapeConfig extends Config
 		hidden = true
 	)
 	default String closedBoards()
+	{
+		return "";
+	}
+
+	@ConfigItem(
+		keyName = OPEN_LEADERBOARDS,
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default String openLeaderboards()
 	{
 		return "";
 	}

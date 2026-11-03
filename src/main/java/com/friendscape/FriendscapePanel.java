@@ -69,6 +69,9 @@ class FriendscapePanel extends PluginPanel
 		/** Remembers whether a card's mini board is open, per Event. */
 		void setBoardOpen(int number, boolean open);
 
+		/** Remembers whether a metric card's Leaderboard is open, per Event (SPEC 10.3). */
+		void setLeaderboardOpen(int number, boolean open);
+
 		/** Votes from a Voting card for a Candidate, by its Ballot place (SPEC 4.9). */
 		void vote(int number, int candidate);
 
@@ -87,6 +90,12 @@ class FriendscapePanel extends PluginPanel
 
 	/** The space between a card's blocks, such as above its links. */
 	private static final int CARD_GAP = 6;
+	/** What a card leaves for its content: the side panel less its border and the card's padding. */
+	static final int CARD_WIDTH = PluginPanel.PANEL_WIDTH - 20 - 16;
+	/** How far a Leaderboard's contributors and own line sit in from their Team. */
+	private static final int INDENT = 8;
+	/** Between a Leaderboard row's name and its value. */
+	private static final int ROW_GAP = 5;
 
 	static final String VOTE_NOTE = "Cast in game, website changes blocked";
 
@@ -234,7 +243,8 @@ class FriendscapePanel extends PluginPanel
 	private void addCard(EventCard card, PanelState state)
 	{
 		CardView view = new CardView(card, !state.getClosedBoards().contains(card.getNumber()),
-			state.getHiddenStandings().contains(card.getNumber()), state.getHiddenCodewords().contains(card.getNumber()));
+			state.getOpenLeaderboards().contains(card.getNumber()), state.getHiddenStandings().contains(card.getNumber()),
+			state.getHiddenCodewords().contains(card.getNumber()));
 		cardViews.add(view);
 		cards.add(view);
 	}
@@ -383,12 +393,66 @@ class FriendscapePanel extends PluginPanel
 		}
 	}
 
+	/** A Leaderboard row: place, name and mark on the left with only the name cut to fit, the value right aligned. */
+	static class LeaderboardRow extends JPanel
+	{
+		final JLabel name = new JLabel();
+		final JLabel value = new JLabel();
+
+		LeaderboardRow(EventCard.Row row, boolean left)
+		{
+			super(new BorderLayout(ROW_GAP, 0));
+			setOpaque(false);
+			setAlignmentX(LEFT_ALIGNMENT);
+			int indent = row.isIndent() ? INDENT : 0;
+			setBorder(BorderFactory.createEmptyBorder(0, indent, 0, 0));
+			Color color = left ? ColorScheme.MEDIUM_GRAY_COLOR : shade(row.getShade());
+			for (JLabel label : new JLabel[]{name, value})
+			{
+				label.setFont(FontManager.getRunescapeSmallFont());
+				label.setForeground(color);
+				label.setToolTipText(row.getTooltip());
+			}
+			value.setText(row.getValue());
+			if (row.isSkull())
+			{
+				value.setIcon(Glyphs.skull());
+			}
+			int nameWidth = CARD_WIDTH - indent - ROW_GAP - value.getPreferredSize().width;
+			name.setText(row.isGap() ? EventCard.Row.GAP_TEXT : TextFit.fit(row.getPlace(), row.getName(), row.getMark(),
+				name.getFontMetrics(name.getFont()), nameWidth));
+			add(name, BorderLayout.CENTER);
+			add(value, BorderLayout.EAST);
+			// Full card width, so the value sits at the right edge, at its own height
+			setMaximumSize(new Dimension(CARD_WIDTH, getPreferredSize().height));
+		}
+
+		/** The player's rows in the brand orange, as on the Team dropdown; others light gray; removed members grey. */
+		private static Color shade(EventCard.Shade shade)
+		{
+			switch (shade)
+			{
+				case MINE:
+					return ColorScheme.BRAND_ORANGE;
+				case REMOVED:
+					return ColorScheme.MEDIUM_GRAY_COLOR;
+				default:
+					return ColorScheme.LIGHT_GRAY_COLOR;
+			}
+		}
+	}
+
 	/** One Event card: name, state dot and detail, standing lines, then its links. */
 	class CardView extends JPanel
 	{
 		final JLabel name = new JLabel();
 		final JLabel detail = new JLabel();
 		final JPanel standing = new JPanel();
+		/** The Leaderboard rows, shown in place of the standing lines while open. */
+		final JPanel leaderboard = new JPanel();
+		final JButton leaderboardToggle = new JButton();
+		/** The standing lines an open Leaderboard hides; the notes under them stay. */
+		private final List<JLabel> standingLines = new ArrayList<>();
 		final JButton openButton = new JButton();
 		final JButton uploadButton = new JButton("Open event page to upload");
 		final JButton reportButton = new JButton("Report to Friendscape");
@@ -411,7 +475,8 @@ class FriendscapePanel extends PluginPanel
 		final JButton voteButton = new JButton("Vote");
 		final JLabel voteNote = new JLabel(VOTE_NOTE);
 
-		CardView(EventCard card, boolean boardOpen, boolean standingsHidden, boolean codewordHidden)
+		CardView(EventCard card, boolean boardOpen, boolean leaderboardOpen, boolean standingsHidden,
+			boolean codewordHidden)
 		{
 			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 			setBackground(ColorScheme.DARKER_GRAY_COLOR);
@@ -442,28 +507,21 @@ class FriendscapePanel extends PluginPanel
 			standing.setLayout(new BoxLayout(standing, BoxLayout.Y_AXIS));
 			standing.setOpaque(false);
 			standing.setAlignmentX(LEFT_ALIGNMENT);
-			List<String> standingLines = card.getStanding();
+			List<String> lines = card.getStanding();
 			EventCard.Skull skull = card.getSkull();
-			for (int i = 0; i < standingLines.size(); i++)
+			for (int i = 0; i < lines.size(); i++)
 			{
-				JLabel label = new JLabel(standingLines.get(i));
+				JLabel label = new JLabel(lines.get(i));
 				label.setFont(FontManager.getRunescapeSmallFont());
 				label.setForeground(card.isLeft() ? ColorScheme.MEDIUM_GRAY_COLOR : ColorScheme.LIGHT_GRAY_COLOR);
-				String tooltip = i == standingLines.size() - 1 ? card.getGainTooltip() : null;
+				String tooltip = i == lines.size() - 1 ? card.getGainTooltip() : null;
 				if (skull != null && i == skull.getLine())
 				{
 					label.setIcon(Glyphs.skull());
-					label.setToolTipText(tooltip == null ? skull.getTooltip() : tooltip + ". " + skull.getTooltip());
-					standing.add(label);
-					// The current Life's gain, small beside the best Life's (SPEC 5.7)
-					JLabel current = new JLabel(skull.getCurrent());
-					current.setFont(FontManager.getRunescapeSmallFont());
-					current.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
-					current.setToolTipText(skull.getCurrentTooltip());
-					standing.add(current);
-					continue;
+					tooltip = tooltip == null ? skull.getTooltip() : tooltip + ". " + skull.getTooltip();
 				}
 				label.setToolTipText(tooltip);
+				standingLines.add(label);
 				standing.add(label);
 			}
 			for (String line : card.getNotes())
@@ -524,6 +582,32 @@ class FriendscapePanel extends PluginPanel
 				actions.report(card.getNumber());
 			});
 
+			leaderboard.setLayout(new BoxLayout(leaderboard, BoxLayout.Y_AXIS));
+			leaderboard.setOpaque(false);
+			leaderboard.setAlignmentX(LEFT_ALIGNMENT);
+			List<EventCard.Row> rows = card.getLeaderboard();
+			if (rows != null)
+			{
+				for (EventCard.Row row : rows)
+				{
+					leaderboard.add(new LeaderboardRow(row, card.isLeft()));
+				}
+			}
+			leaderboardToggle.setVisible(rows != null);
+			leaderboardToggle.setAlignmentX(LEFT_ALIGNMENT);
+			leaderboardToggle.setFocusable(false);
+			if (card.isLeft())
+			{
+				leaderboardToggle.setForeground(ColorScheme.MEDIUM_GRAY_COLOR);
+			}
+			showLeaderboard(rows != null && leaderboardOpen);
+			leaderboardToggle.addActionListener(e ->
+			{
+				boolean open = !leaderboard.isVisible();
+				showLeaderboard(open);
+				actions.setLeaderboardOpen(card.getNumber(), open);
+			});
+
 			JPanel ballotPanel = new JPanel();
 			ballotPanel.setLayout(new BoxLayout(ballotPanel, BoxLayout.Y_AXIS));
 			ballotPanel.setOpaque(false);
@@ -552,10 +636,12 @@ class FriendscapePanel extends PluginPanel
 
 			add(title);
 			add(status);
+			add(leaderboard);
 			add(standing);
 			add(ballotPanel);
 			add(uploadButton);
 			add(reportButton);
+			add(leaderboardToggle);
 			add(boardToggle);
 			if (board != null)
 			{
@@ -696,6 +782,32 @@ class FriendscapePanel extends PluginPanel
 			}
 		}
 
+		/** Opens the Leaderboard in place of the standing lines, or closes it. */
+		private void showLeaderboard(boolean open)
+		{
+			leaderboard.setVisible(open);
+			standingLines.forEach(line -> line.setVisible(!open));
+			leaderboardToggle.setText(open ? "Hide leaderboard" : "Show leaderboard");
+			revalidate();
+		}
+
+		LeaderboardRow leaderboardRow(int index)
+		{
+			return (LeaderboardRow) leaderboard.getComponent(index);
+		}
+
+		/** Each row as "name  value". */
+		List<String> leaderboardTexts()
+		{
+			List<String> texts = new ArrayList<>();
+			for (Component c : leaderboard.getComponents())
+			{
+				LeaderboardRow row = (LeaderboardRow) c;
+				texts.add(row.value.getText().isEmpty() ? row.name.getText() : row.name.getText() + "  " + row.value.getText());
+			}
+			return texts;
+		}
+
 		List<String> ballotTexts()
 		{
 			List<String> texts = new ArrayList<>();
@@ -721,7 +833,10 @@ class FriendscapePanel extends PluginPanel
 			List<String> texts = new ArrayList<>();
 			for (Component c : standing.getComponents())
 			{
-				texts.add(((JLabel) c).getText());
+				if (c.isVisible())
+				{
+					texts.add(((JLabel) c).getText());
+				}
 			}
 			return texts;
 		}

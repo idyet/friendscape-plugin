@@ -249,12 +249,15 @@ public class StubApiTest
 		Path shipped = Paths.get("src/test/resources/stub");
 		StubApi real = new StubApi(shipped, Clock.fixed(NOW, ZoneOffset.UTC), logged::add);
 		DiscoveryResponse showcase = real.discovery("Iron Man");
-		assertEquals(5, showcase.getEvents().size());
+		assertEquals(7, showcase.getEvents().size());
 		assertEquals("died", showcase.getEvents().get(0).getStanding().getSkull().getKind());
 		assertEquals("transferred", showcase.getEvents().get(1).getStanding().getSkull().getKind());
 		assertNull(showcase.getEvents().get(2).getStanding().getSkull());
 		assertTrue(showcase.getEvents().get(3).getNotice().isProblem());
 		assertEquals("[stub] Plain notice, problem false.", showcase.getEvents().get(4).getNotice().getText());
+		assertNull(showcase.getEvents().get(4).getLeaderboard());
+		assertEquals("Iron Man", showcase.getEvents().get(5).getLeaderboard().getTeams().get(4).getName());
+		assertTrue(showcase.getEvents().get(6).getLeaderboard().getTeams().get(3).getMembers().get(1).isRemoved());
 
 		assertTrue(real.scenario("skull-appears"));
 		assertEquals("died", real.discovery("Iron Man").getEvents().get(2).getStanding().getSkull().getKind());

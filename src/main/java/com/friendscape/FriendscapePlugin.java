@@ -297,6 +297,12 @@ public class FriendscapePlugin extends Plugin
 			}
 
 			@Override
+			public void setLeaderboardOpen(int number, boolean open)
+			{
+				setStored(FriendscapeConfig.OPEN_LEADERBOARDS, config.openLeaderboards(), number, open);
+			}
+
+			@Override
 			public void setStandingsHidden(int number, boolean hidden)
 			{
 				setStored(FriendscapeConfig.HIDDEN_STANDINGS, config.hiddenStandings(), number, hidden);
@@ -847,6 +853,7 @@ public class FriendscapePlugin extends Plugin
 			Set<Integer> live = response.liveNumbers();
 			pruneStored(FriendscapeConfig.HIDDEN_STANDINGS, config.hiddenStandings(), live);
 			pruneStored(FriendscapeConfig.HIDDEN_CODEWORDS, config.hiddenCodewords(), live);
+			pruneStored(FriendscapeConfig.OPEN_LEADERBOARDS, config.openLeaderboards(), response.discoveredNumbers());
 			refreshPanel();
 		}, answered ->
 		{
@@ -1095,6 +1102,7 @@ public class FriendscapePlugin extends Plugin
 			.status(status())
 			.cards(cards)
 			.closedBoards(StoredEventNumbers.parse(config.closedBoards()))
+			.openLeaderboards(StoredEventNumbers.parse(config.openLeaderboards()))
 			.hiddenStandings(hiddenStandings)
 			.hiddenCodewords(hiddenCodewords)
 			.byGroup(config.byGroup())

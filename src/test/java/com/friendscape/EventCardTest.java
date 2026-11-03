@@ -3,9 +3,11 @@ package com.friendscape;
 import com.google.gson.Gson;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import org.junit.Test;
@@ -138,16 +140,14 @@ public class EventCardTest
 	}
 
 	@Test
-	public void putsTheSkullOnTheOwnGainLineWithTheCurrentLifeBesideIt()
+	public void putsTheSkullOnTheOwnGainLineWithTheCurrentLifeInItsTooltip()
 	{
 		EventCard card = hardcore(false, DIED);
 
 		assertEquals(List.of("Team Bandos: 2nd of 4, +3,000,000 xp", "+1.2M xp since start"),
 			card.getStanding());
 		assertEquals(1, card.getSkull().getLine());
-		assertEquals("current life: 340K", card.getSkull().getCurrent());
-		assertEquals("340,000 xp", card.getSkull().getCurrentTooltip());
-		assertEquals("Died 2 Nov 14:05. Showing best life.", card.getSkull().getTooltip());
+		assertEquals("Died 2 Nov 14:05. Showing best life. Current life: 340K.", card.getSkull().getTooltip());
 	}
 
 	@Test
@@ -164,7 +164,7 @@ public class EventCardTest
 	{
 		EventCard card = hardcore(true, DIED.replace("died", "transferred"));
 
-		assertEquals("Transferred 2 Nov 14:05. Final is best life.", card.getSkull().getTooltip());
+		assertEquals("Transferred 2 Nov 14:05. Final is best life. Current life: 340K.", card.getSkull().getTooltip());
 	}
 
 	@Test
@@ -174,8 +174,7 @@ public class EventCardTest
 			+ "\"teams\":[{\"name\":\"Iron Man\",\"solo\":true,\"rank\":1,\"of\":12,\"gain\":51}],"
 			+ "\"skull\":{\"kind\":\"died\",\"at\":\"2026-11-02T14:05:00.000Z\",\"best\":51,\"current\":1204}}");
 
-		assertEquals("current life: 1,204", card.getSkull().getCurrent());
-		assertEquals("Died 2 Nov 14:05. Showing best life.", card.getSkull().getCurrentTooltip());
+		assertEquals("Died 2 Nov 14:05. Showing best life. Current life: 1,204.", card.getSkull().getTooltip());
 	}
 
 	@Test
@@ -183,7 +182,7 @@ public class EventCardTest
 	{
 		EventCard card = hardcore(true, DIED.replace("2026-11-02T14:05:00.000Z", "soon"));
 
-		assertEquals("Died. Showing best life.", card.getSkull().getTooltip());
+		assertEquals("Died. Showing best life. Current life: 340K.", card.getSkull().getTooltip());
 	}
 
 	@Test
@@ -408,5 +407,129 @@ public class EventCardTest
 
 		assertEquals(CardState.LEFT, card.getState());
 		assertNull(card.getVote());
+	}
+
+	/** A Leaderboard Team row as discovery sends it, {@code extra} closing it, such as its members. */
+	private static String boardTeam(String name, boolean solo, int rank, long gain, boolean mine, boolean gap,
+		String extra)
+	{
+		return "{\"name\":\"" + name + "\",\"solo\":" + solo + ",\"rank\":" + rank + ",\"of\":9,\"gain\":" + gain
+			+ ",\"mine\":" + mine + ",\"gap\":" + gap + (extra.isEmpty() ? ",\"skull\":null,\"members\":[],\"own\":null" : extra)
+			+ "}";
+	}
+
+	private static String member(String rsn, int rank, long gain, boolean mine, boolean removed)
+	{
+		return "{\"rsn\":\"" + rsn + "\",\"rank\":" + rank + ",\"gain\":" + gain + ",\"mine\":" + mine
+			+ ",\"removed\":" + removed + ",\"skull\":null}";
+	}
+
+	private static final String SOLO_BOARD = "\"leaderboard\":{\"teams\":["
+		+ boardTeam("Zezima", true, 1, 5_000_000, false, false, "") + ","
+		+ boardTeam("Lynx Titan", true, 2, 4_100_000, false, false, "") + ","
+		+ boardTeam("Woox", true, 3, 3_000_000, false, false, "") + ","
+		+ boardTeam("B0aty", true, 6, 1_500_000, false, true, "") + ","
+		+ boardTeam("Iron Man", true, 7, 1_204_000, true, false, ",\"members\":[],\"own\":null," + DIED) + ","
+		+ boardTeam("Settled", true, 8, 900_000, false, false, "") + "]}";
+
+	private static List<String> texts(List<EventCard.Row> rows)
+	{
+		List<String> texts = new ArrayList<>();
+		for (EventCard.Row row : rows)
+		{
+			texts.add(row.text());
+		}
+		return texts;
+	}
+
+	@Test
+	public void drawsASoloLeaderboardWithItsGapAndThePlayersRowInOrange()
+	{
+		List<EventCard.Row> rows = card(SOLO_BOARD).getLeaderboard();
+
+		assertEquals(List.of("1st Zezima  +5M xp", "2nd Lynx Titan  +4.1M xp", "3rd Woox  +3M xp", "...",
+			"6th B0aty  +1.5M xp", "7th Iron Man  +1.2M xp", "8th Settled  +900K xp"), texts(rows));
+		assertTrue(rows.get(3).isGap());
+		assertEquals(EventCard.Shade.MINE, rows.get(5).getShade());
+		assertEquals(EventCard.Shade.OTHER, rows.get(0).getShade());
+		assertFalse(rows.get(0).isIndent());
+	}
+
+	@Test
+	public void putsTheFullXpFigureAndTheSkullInALeaderboardRowsTooltip()
+	{
+		List<EventCard.Row> rows = card(SOLO_BOARD).getLeaderboard();
+
+		assertEquals("+5,000,000 xp", rows.get(0).getTooltip());
+		assertFalse(rows.get(0).isSkull());
+		assertTrue(rows.get(5).isSkull());
+		assertEquals("+1,204,000 xp. Died 2 Nov 14:05. Showing best life. Current life: 340K.", rows.get(5).getTooltip());
+	}
+
+	private static final String TEAM_BOARD = "\"format\":\"botw\",\"leaderboard\":{\"teams\":["
+		+ boardTeam("Zamorak", false, 1, 300, false, false, ",\"skull\":null,\"members\":["
+			+ member("Alice", 1, 120, false, false) + "," + member("Bob", 2, 100, false, true) + ","
+			+ member("Carl", 3, 80, false, false) + "],\"own\":null") + ","
+		+ boardTeam("Bandos", false, 5, 120, true, true, ",\"skull\":null,\"members\":["
+			+ member("Dee", 1, 60, false, false) + "," + member("Eve", 2, 40, false, false) + ","
+			+ member("Fay", 3, 10, false, false) + "],\"own\":{\"rsn\":\"Iron Man\",\"rank\":7,\"of\":9,\"gain\":5,"
+			+ "\"skull\":{\"kind\":\"died\",\"at\":\"2026-11-02T14:05:00.000Z\",\"best\":5,\"current\":1204}}") + "]}";
+
+	@Test
+	public void drawsATeamLeaderboardWithIndentedContributorsAndTheOwnLine()
+	{
+		List<EventCard.Row> rows = card(TEAM_BOARD).getLeaderboard();
+
+		assertEquals(List.of("1st Zamorak  +300 kc", "1st Alice  +120", "2nd Bob  +100", "3rd Carl  +80", "...",
+			"5th Bandos (you)  +120 kc", "1st Dee  +60", "2nd Eve  +40", "3rd Fay  +10", "Iron Man:  +5 (7th of 9)"),
+			texts(rows));
+		assertFalse(rows.get(0).isIndent());
+		assertTrue(rows.get(1).isIndent());
+		assertTrue(rows.get(9).isIndent());
+		assertEquals(EventCard.Shade.MINE, rows.get(5).getShade());
+		assertEquals(EventCard.Shade.OTHER, rows.get(6).getShade());
+		assertEquals(EventCard.Shade.MINE, rows.get(9).getShade());
+	}
+
+	@Test
+	public void greysARemovedContributorAndSaysWhy()
+	{
+		EventCard.Row bob = card(TEAM_BOARD).getLeaderboard().get(2);
+
+		assertEquals(EventCard.Shade.REMOVED, bob.getShade());
+		assertEquals("Removed from the roster", bob.getTooltip());
+	}
+
+	@Test
+	public void keepsKcInFullWithNoTooltipButTheSkulls()
+	{
+		List<EventCard.Row> rows = card(TEAM_BOARD).getLeaderboard();
+
+		assertNull(rows.get(0).getTooltip());
+		assertNull(rows.get(1).getTooltip());
+		assertTrue(rows.get(9).isSkull());
+		assertEquals("Died 2 Nov 14:05. Showing best life. Current life: 1,204.", rows.get(9).getTooltip());
+	}
+
+	@Test
+	public void showsContributorXpShortWithoutTheUnit()
+	{
+		List<EventCard.Row> rows = card(TEAM_BOARD.replace("\"format\":\"botw\"", "\"format\":\"sotw\"")
+			.replace("\"gain\":120,\"mine\":false", "\"gain\":500000,\"mine\":false")).getLeaderboard();
+
+		assertEquals("1st Alice  +500K", rows.get(1).text());
+		assertEquals("+500,000 xp", rows.get(1).getTooltip());
+	}
+
+	@Test
+	public void hasALeaderboardOnlyOnceAMetricEventHasStartedAndTheServerSendsOne()
+	{
+		assertNotNull(card(SOLO_BOARD).getLeaderboard());
+		assertNotNull(card(SOLO_BOARD + ",\"phase\":\"ended\"").getLeaderboard());
+		assertNotNull(card(SOLO_BOARD + ",\"phase\":\"finalized\"").getLeaderboard());
+		assertNotNull(EventCard.of(event(SOLO_BOARD), true, EventCard.Queued.NONE, ZoneOffset.UTC).getLeaderboard());
+		assertNull(card(SOLO_BOARD + ",\"phase\":\"scheduled\"").getLeaderboard());
+		assertNull(card("").getLeaderboard());
+		assertNull(bingo(5, SOLO_BOARD).getLeaderboard());
 	}
 }

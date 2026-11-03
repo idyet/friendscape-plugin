@@ -82,6 +82,12 @@ public class FriendscapePanelTest
 		}
 
 		@Override
+		public void setLeaderboardOpen(int number, boolean open)
+		{
+			actions.add((open ? "show leaderboard " : "hide leaderboard ") + number);
+		}
+
+		@Override
 		public void vote(int number, int candidate)
 		{
 			actions.add("vote " + number + " #" + candidate);
@@ -116,7 +122,7 @@ public class FriendscapePanelTest
 	{
 		boolean live = state == CardState.TRACKING || state == CardState.ATTENTION;
 		return new EventCard(number, "Event " + number, state, "detail " + number, standing, null, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, live, null, false, null, null, null, null);
 	}
 
 	private static PanelState discovered(EventCard... cards)
@@ -342,7 +348,7 @@ public class FriendscapePanelTest
 	public void showsACardsNotesBelowItsStanding()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of("1st of 2, +5 xp"), null, List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null, null)));
+			List.of("1st of 2, +5 xp"), null, List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null, null, null)));
 
 		assertEquals(List.of("1st of 2, +5 xp", "3 waiting to send"), panel.cardViews.get(0).standingTexts());
 	}
@@ -353,7 +359,7 @@ public class FriendscapePanelTest
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.TRACKING, "Tracking",
 			List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start"), "+13,034,431 xp",
 			List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null,
-			null, null)));
+			null, null, null)));
 
 		Component[] lines = panel.cardViews.get(0).standing.getComponents();
 		assertNull(((JLabel) lines[0]).getToolTipText());
@@ -362,22 +368,21 @@ public class FriendscapePanelTest
 	}
 
 	@Test
-	public void showsTheSkullOnItsLineWithTheCurrentLifeUnderIt()
+	public void showsTheSkullOnItsLineWithTheCurrentLifeInItsTooltip()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.TRACKING, "Tracking",
 			List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start"), "+13,034,431 xp",
 			List.of("3 waiting to send"), "", null, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null,
-			null, new EventCard.Skull(1, "Died 2 Nov 14:05. Showing best life.", "current life: 340K",
-				"340,123 xp"))));
+			null, new EventCard.Skull(1, "Died 2 Nov 14:05. Showing best life. Current life: 340K."), null)));
 
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
-		assertEquals(List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start", "current life: 340K",
-			"3 waiting to send"), view.standingTexts());
+		assertEquals(List.of("Bandos: 1st of 2, +13,100,000 xp", "+13M xp since start", "3 waiting to send"),
+			view.standingTexts());
 		Component[] lines = view.standing.getComponents();
 		assertNull(((JLabel) lines[0]).getIcon());
 		assertNotNull(((JLabel) lines[1]).getIcon());
-		assertEquals("+13,034,431 xp. Died 2 Nov 14:05. Showing best life.", ((JLabel) lines[1]).getToolTipText());
-		assertEquals("340,123 xp", ((JLabel) lines[2]).getToolTipText());
+		assertEquals("+13,034,431 xp. Died 2 Nov 14:05. Showing best life. Current life: 340K.",
+			((JLabel) lines[1]).getToolTipText());
 	}
 
 	@Test
@@ -392,7 +397,7 @@ public class FriendscapePanelTest
 	public void linksToTheUploadPageWhileScreenshotsAreNeeded()
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION, "1 item needs a screenshot",
-			List.of(), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null, null)));
+			List.of(), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, true, false, true, null, false, null, null, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.uploadButton.isVisible());
@@ -409,7 +414,7 @@ public class FriendscapePanelTest
 	{
 		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.ATTENTION,
 			"On hold while Friendscape checks this RSN", List.of(), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE,
-			false, true, true, null, false, null, null, null)));
+			false, true, true, null, false, null, null, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertTrue(view.reportButton.isVisible());
@@ -436,7 +441,7 @@ public class FriendscapePanelTest
 			+ "{\"state\":\"empty\",\"tier\":null,\"fill\":0},{\"state\":\"empty\",\"tier\":null,\"fill\":0}]}]}";
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of("Red: 2nd of 2, 0 pts"),
-			null, List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null, null);
+			null, List.of(), "2nd/2", board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null, null, null);
 	}
 
 	/** A drawn bingo card around a board given as discovery JSON. */
@@ -444,7 +449,7 @@ public class FriendscapePanelTest
 	{
 		DiscoveryResponse.Board board = new com.google.gson.Gson().fromJson(boardJson, DiscoveryResponse.Board.class);
 		return new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null, List.of(), "",
-			board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null, null);
+			board, EventCard.OPEN_EVENT_PAGE, false, false, true, null, false, null, null, null, null);
 	}
 
 	@Test
@@ -540,7 +545,7 @@ public class FriendscapePanelTest
 		EventCard small = bingoCard();
 		DiscoveryResponse.Board large = new DiscoveryResponse.Board(8, small.getBoard().getTiles(), small.getBoard().getTeams());
 		panel.update(discovered(new EventCard(222222, "Autumn bingo", CardState.TRACKING, "Tracking", List.of(), null, List.of(),
-			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null, null, null)));
+			"", large, EventCard.OPEN_BOARD, false, false, true, null, false, null, null, null, null)));
 		FriendscapePanel.CardView view = panel.cardViews.get(0);
 
 		assertEquals(null, view.board);
@@ -647,6 +652,126 @@ public class FriendscapePanelTest
 		assertFalse(panel.cardViews.get(0).board.isVisible());
 	}
 
+	private static final List<EventCard.Row> LEADERBOARD = List.of(
+		new EventCard.Row(false, false, "1st ", "Zamorak", "", "+300 kc", null, EventCard.Shade.OTHER, false),
+		new EventCard.Row(false, true, "1st ", "Alice", "", "+120", null, EventCard.Shade.OTHER, false),
+		new EventCard.Row(false, true, "2nd ", "Bob", "", "+100", "Removed from the roster", EventCard.Shade.REMOVED,
+			false),
+		EventCard.Row.GAP,
+		new EventCard.Row(false, false, "5th ", "Bandos", " (you)", "+120 kc", null, EventCard.Shade.MINE, false),
+		new EventCard.Row(false, true, "", "Iron Man", ":", "+5 (7th of 9)", "Died. Showing best life. Current life: 1.",
+			EventCard.Shade.MINE, true));
+
+	private static EventCard ranked(CardState state)
+	{
+		return card(111111, state, List.of("Bandos: 5th of 9, +120 kc", "+5 kc since start")).withLeaderboard(LEADERBOARD);
+	}
+
+	private static PanelState openLeaderboard(EventCard card)
+	{
+		return discovered(card).toBuilder().openLeaderboards(Set.of(card.getNumber())).build();
+	}
+
+	@Test
+	public void aLeaderboardStartsCollapsedUnderTheStandingLine()
+	{
+		panel.update(discovered(ranked(CardState.TRACKING)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.leaderboardToggle.isVisible());
+		assertEquals("Show leaderboard", view.leaderboardToggle.getText());
+		assertFalse(view.leaderboard.isVisible());
+		assertEquals(List.of("Bandos: 5th of 9, +120 kc", "+5 kc since start"), view.standingTexts());
+	}
+
+	@Test
+	public void anOpenLeaderboardReplacesTheStandingLine()
+	{
+		panel.update(openLeaderboard(ranked(CardState.TRACKING)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertEquals("Hide leaderboard", view.leaderboardToggle.getText());
+		assertTrue(view.leaderboard.isVisible());
+		assertEquals(List.of(), view.standingTexts());
+		assertEquals(List.of("1st Zamorak  +300 kc", "1st Alice  +120", "2nd Bob  +100", "...",
+			"5th Bandos (you)  +120 kc", "Iron Man:  +5 (7th of 9)"), view.leaderboardTexts());
+	}
+
+	@Test
+	public void theLeaderboardTogglesAndRemembersPerEvent()
+	{
+		panel.update(discovered(ranked(CardState.TRACKING)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		view.leaderboardToggle.doClick();
+
+		assertTrue(view.leaderboard.isVisible());
+		assertEquals(List.of(), view.standingTexts());
+		view.leaderboardToggle.doClick();
+		assertFalse(view.leaderboard.isVisible());
+		assertEquals(List.of("show leaderboard 111111", "hide leaderboard 111111"), actions);
+	}
+
+	@Test
+	public void colorsTheLeaderboardRowsByWhoseTheyAre()
+	{
+		panel.update(openLeaderboard(ranked(CardState.TRACKING)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertEquals(ColorScheme.LIGHT_GRAY_COLOR, view.leaderboardRow(0).name.getForeground());
+		assertEquals(ColorScheme.MEDIUM_GRAY_COLOR, view.leaderboardRow(2).name.getForeground());
+		assertEquals("Removed from the roster", view.leaderboardRow(2).name.getToolTipText());
+		assertEquals(ColorScheme.BRAND_ORANGE, view.leaderboardRow(4).name.getForeground());
+		assertEquals(ColorScheme.BRAND_ORANGE, view.leaderboardRow(4).value.getForeground());
+	}
+
+	@Test
+	public void indentsContributorsAndMarksASkulledRow()
+	{
+		panel.update(openLeaderboard(ranked(CardState.TRACKING)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.leaderboardRow(1).getInsets().left > view.leaderboardRow(0).getInsets().left);
+		assertNull(view.leaderboardRow(0).value.getIcon());
+		assertNotNull(view.leaderboardRow(5).value.getIcon());
+		assertEquals("Died. Showing best life. Current life: 1.", view.leaderboardRow(5).value.getToolTipText());
+	}
+
+	@Test
+	public void cutsALongNameButKeepsItsPlaceMarkAndValue()
+	{
+		String longName = "The Longest Team Name Anyone Ever Gave A Team";
+		panel.update(openLeaderboard(card(111111, CardState.TRACKING, List.of()).withLeaderboard(List.of(
+			new EventCard.Row(false, false, "5th ", longName, " (you)", "+1,234,567 kc", null, EventCard.Shade.MINE,
+				false)))));
+		String name = panel.cardViews.get(0).leaderboardRow(0).name.getText();
+
+		assertTrue(name, name.startsWith("5th The"));
+		assertTrue(name, name.endsWith("... (you)"));
+		assertEquals("+1,234,567 kc", panel.cardViews.get(0).leaderboardRow(0).value.getText());
+	}
+
+	@Test
+	public void greysTheLeaderboardOfALeftCard()
+	{
+		panel.update(openLeaderboard(ranked(CardState.LEFT)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertTrue(view.leaderboardToggle.isVisible());
+		assertEquals(ColorScheme.MEDIUM_GRAY_COLOR, view.leaderboardToggle.getForeground());
+		assertEquals(ColorScheme.MEDIUM_GRAY_COLOR, view.leaderboardRow(4).name.getForeground());
+	}
+
+	@Test
+	public void offersNoLeaderboardWithoutOne()
+	{
+		panel.update(openLeaderboard(card(111111, CardState.TRACKING, List.of("1st of 2, +5 xp"))));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertFalse(view.leaderboardToggle.isVisible());
+		assertEquals(List.of("1st of 2, +5 xp"), view.standingTexts());
+	}
+
 	@Test
 	public void aMetricCardHasNoBoard()
 	{
@@ -694,7 +819,7 @@ public class FriendscapePanelTest
 	private static EventCard finalizedCard(CardState state)
 	{
 		return new EventCard(111111, "Event 111111", state, "Final", List.of(), null, List.of(), "", null,
-			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null, null, null);
+			EventCard.OPEN_EVENT_PAGE, false, false, false, null, true, null, null, null, null);
 	}
 
 	@Test
@@ -766,7 +891,7 @@ public class FriendscapePanelTest
 	{
 		return new EventCard(card.getNumber(), card.getName(), card.getState(), card.getDetail(), card.getStanding(),
 			card.getGainTooltip(), card.getNotes(), card.getRank(), card.getBoard(), card.getLink(), card.isUpload(), card.isReport(),
-			card.isLive(), card.getVote(), card.isFinalized(), codeword, card.getGroup(), card.getSkull());
+			card.isLive(), card.getVote(), card.isFinalized(), codeword, card.getGroup(), card.getSkull(), card.getLeaderboard());
 	}
 
 	@Test
@@ -857,7 +982,7 @@ public class FriendscapePanelTest
 			+ "\"choice\":" + choice + "}";
 		DiscoveryResponse.Vote vote = new com.google.gson.Gson().fromJson(json, DiscoveryResponse.Vote.class);
 		return new EventCard(333333, "Skill of the week #1", CardState.VOTING, "Voting, closes 5 Nov 18:00", List.of(),
-			null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null, null, null);
+			null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, false, vote, false, null, null, null, null);
 	}
 
 	@Test

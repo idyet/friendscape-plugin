@@ -55,19 +55,62 @@ class EventCard
 	DiscoveryResponse.Group group;
 	/** The Hardcore death skull on a standing line; null without one (SPEC 5.7). */
 	Skull skull;
+	/**
+	 * A started metric Event's Leaderboard rows, drawn in place of the standing line when opened
+	 * (SPEC 10.3); null when there is none to show, so the card offers no toggle.
+	 */
+	@With
+	List<Row> leaderboard;
 
-	/** A skull by the player's standing line, with the current Life's gain under it (SPEC 5.7). */
+	/** A skull by the player's standing line (SPEC 5.7). */
 	@Value
 	static class Skull
 	{
 		/** The standing line it marks: the player's own gain, or their solo line. */
 		int line;
-		/** "Died 2 Nov 14:05. Showing best life." */
+		/** "Died 2 Nov 14:05. Showing best life. Current life: 340K." */
 		String tooltip;
-		/** "current life: 340K". */
-		String current;
-		/** The current Life's full figure for an XP gain shown short (SPEC 6.8), else the tooltip. */
-		String currentTooltip;
+	}
+
+	/** How a Leaderboard row is coloured: the player's own, anyone else's, or a removed member's. */
+	enum Shade
+	{
+		MINE,
+		OTHER,
+		REMOVED
+	}
+
+	/**
+	 * One Leaderboard row: {@code place}, {@code name} and {@code mark} on the left, of which only the
+	 * name is cut to fit, and {@code value} right aligned. A gap row shows only "...".
+	 */
+	@Value
+	static class Row
+	{
+		static final String GAP_TEXT = TextFit.ELLIPSIS;
+		static final Row GAP = new Row(true, false, "", GAP_TEXT, "", "", null, Shade.OTHER, false);
+
+		boolean gap;
+		/** A contributor or own line, under its Team. */
+		boolean indent;
+		/** "1st ", or empty on an own line. */
+		String place;
+		String name;
+		/** " (you)" on the player's Team, ":" on an own line, else empty. */
+		String mark;
+		/** "+1.2M xp" on a Team or solo row; no unit under a Team. */
+		String value;
+		/** Null when there is nothing more to say. */
+		String tooltip;
+		Shade shade;
+		/** A Hardcore death skull by the value (SPEC 5.7). */
+		boolean skull;
+
+		/** The row as one line: "1st Red (you)  +1.2M xp". */
+		String text()
+		{
+			return gap ? GAP_TEXT : place + name + mark + "  " + value;
+		}
 	}
 
 	/** This install's Submissions for the Event (SPEC 10.5): what the server does not know of. */
@@ -96,6 +139,7 @@ class EventCard
 		String gainTooltip = null;
 		String rank = "";
 		Skull skull = null;
+		List<Row> leaderboard = null;
 		if (bingo && started(event))
 		{
 			standing = bingoStanding(board);
@@ -108,6 +152,10 @@ class EventCard
 			rank = rank(event.getStanding());
 			skull = skull(event, zone);
 		}
+		if (!bingo && started(event) && event.getLeaderboard() != null && event.getLeaderboard().getTeams() != null)
+		{
+			leaderboard = leaderboard(event, zone);
+		}
 		boolean upload = (state == CardState.ATTENTION && event.getNeedsEvidence() > 0) || queued.getPushedOut() > 0;
 		boolean report = state == CardState.ATTENTION && DiscoveryResponse.HELD.equals(event.getEntry());
 		boolean live = DiscoveryResponse.LIVE.equals(event.getPhase()) && !left
@@ -115,7 +163,7 @@ class EventCard
 		return new EventCard(event.getNumber(), event.getName(), state, detail(event, state, zone), standing,
 			gainTooltip, notes(queued), rank, board, bingo && !drawn(board) ? OPEN_BOARD : OPEN_EVENT_PAGE, upload, report, live,
 			state == CardState.VOTING ? event.getVote() : null, DiscoveryResponse.FINALIZED.equals(event.getPhase()),
-			live ? event.getCodeword() : null, event.getGroup(), skull);
+			live ? event.getCodeword() : null, event.getGroup(), skull, leaderboard);
 	}
 
 	/** The mini board draws up to 7x7; larger ones are left to the website. */
@@ -295,16 +343,91 @@ class EventCard
 		{
 			return null;
 		}
+		return new Skull(ownGainLine(standing) ? standing.getTeams().size() : 0, skullText(event, skull, zone));
+	}
+
+	/** "Died 2 Nov 14:05. Showing best life. Current life: 340K." (SPEC 5.7); XP short per SPEC 6.8. */
+	private static String skullText(DiscoveryResponse.DiscoveredEvent event, DiscoveryResponse.Skull skull, ZoneId zone)
+	{
 		Instant at = DiscoveryResponse.parse(event, skull.getAt());
 		String when = at == null ? "" : " " + STARTS.format(at.atZone(zone));
-		String tooltip = DiscoveryResponse.Skull.TRANSFERRED.equals(skull.getKind())
+		String death = DiscoveryResponse.Skull.TRANSFERRED.equals(skull.getKind())
 			? "Transferred" + when + ". Final is best life."
 			: "Died" + when + ". Showing best life.";
-		long current = skull.getCurrent();
-		String full = String.format(Locale.ENGLISH, "%,d", current);
-		boolean xp = tracksXp(event);
-		return new Skull(ownGainLine(standing) ? standing.getTeams().size() : 0, tooltip,
-			"current life: " + (xp ? shortAmount(current) : full), xp ? full + " xp" : tooltip);
+		return death + " Current life: " + amount(event, skull.getCurrent()) + ".";
+	}
+
+	/** The Leaderboard in standings order: each Team, its contributors and own line under it, "..." at a gap. */
+	private static List<Row> leaderboard(DiscoveryResponse.DiscoveredEvent event, ZoneId zone)
+	{
+		String unit = " " + (tracksXp(event) ? "xp" : "kc");
+		List<Row> rows = new ArrayList<>();
+		for (DiscoveryResponse.LeaderboardTeam team : event.getLeaderboard().getTeams())
+		{
+			if (team.isGap())
+			{
+				rows.add(Row.GAP);
+			}
+			rows.add(new Row(false, false, ordinal(team.getRank()) + " ", orEmpty(team.getName()),
+				team.isMine() && !team.isSolo() ? " (you)" : "", signed(event, team.getGain()) + unit,
+				tooltip(event, team.getGain(), false, team.getSkull(), zone), team.isMine() ? Shade.MINE : Shade.OTHER,
+				team.getSkull() != null));
+			if (team.getMembers() != null)
+			{
+				for (DiscoveryResponse.LeaderboardMember member : team.getMembers())
+				{
+					Shade shade = member.isRemoved() ? Shade.REMOVED : member.isMine() ? Shade.MINE : Shade.OTHER;
+					rows.add(new Row(false, true, ordinal(member.getRank()) + " ", orEmpty(member.getRsn()), "",
+						signed(event, member.getGain()), tooltip(event, member.getGain(), member.isRemoved(),
+						member.getSkull(), zone), shade, member.getSkull() != null));
+				}
+			}
+			DiscoveryResponse.LeaderboardOwn own = team.getOwn();
+			if (own != null)
+			{
+				rows.add(new Row(false, true, "", orEmpty(own.getRsn()), ":", signed(event, own.getGain()) + " ("
+					+ ordinal(own.getRank()) + " of " + own.getOf() + ")", tooltip(event, own.getGain(), false,
+					own.getSkull(), zone), Shade.MINE, own.getSkull() != null));
+			}
+		}
+		return rows;
+	}
+
+	/** The full XP figure, why a member is greyed and the skull's text, each when it applies; else null. */
+	private static String tooltip(DiscoveryResponse.DiscoveredEvent event, long gain, boolean removed,
+		DiscoveryResponse.Skull skull, ZoneId zone)
+	{
+		List<String> parts = new ArrayList<>();
+		if (tracksXp(event))
+		{
+			parts.add(gain(gain, "xp"));
+		}
+		if (removed)
+		{
+			parts.add("Removed from the roster");
+		}
+		if (skull != null)
+		{
+			parts.add(skullText(event, skull, zone));
+		}
+		return parts.isEmpty() ? null : String.join(". ", parts);
+	}
+
+	private static String orEmpty(String name)
+	{
+		return name == null ? "" : name;
+	}
+
+	/** A gain with its sign: XP short (SPEC 6.8), KC in full. */
+	private static String signed(DiscoveryResponse.DiscoveredEvent event, long gain)
+	{
+		return (gain < 0 ? "" : "+") + amount(event, gain);
+	}
+
+	/** XP short (SPEC 6.8), KC in full. */
+	private static String amount(DiscoveryResponse.DiscoveredEvent event, long amount)
+	{
+		return tracksXp(event) ? shortAmount(amount) : String.format(Locale.ENGLISH, "%,d", amount);
 	}
 
 	private static String rank(DiscoveryResponse.Standing standing)

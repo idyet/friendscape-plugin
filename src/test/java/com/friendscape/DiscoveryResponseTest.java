@@ -153,6 +153,16 @@ public class DiscoveryResponseTest
 	}
 
 	@Test
+	public void listsEveryDiscoveredEventNumberForTheCardChoicesKept()
+	{
+		DiscoveryResponse response = parse(event(111111, "live", "on_roster", ""),
+			event(222222, "finalized", "removed", ""));
+
+		assertEquals(Set.of(111111, 222222), response.discoveredNumbers());
+		assertEquals(Set.of(), GSON.fromJson("{}", DiscoveryResponse.class).discoveredNumbers());
+	}
+
+	@Test
 	public void isEmptyWithNoEvents()
 	{
 		assertTrue(parse().cards(Set.of(), Map.of(), WEEK, NOW, ZoneOffset.UTC).isEmpty());

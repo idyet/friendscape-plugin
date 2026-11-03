@@ -164,6 +164,303 @@
         "text": "[stub] Plain notice, problem false.",
         "problem": false
       }
+    },
+    {
+      "number": 900006,
+      "name": "Leaderboard Agility",
+      "format": "sotw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "{{rsn}}",
+          "size": 1
+        }
+      ],
+      "standing": {
+        "gain": 400000,
+        "teams": [
+          {
+            "name": "{{rsn}}",
+            "solo": true,
+            "rank": 5,
+            "of": 9,
+            "gain": 400000
+          }
+        ]
+      },
+      "leaderboard": {
+        "teams": [
+          {
+            "name": "Zezima",
+            "solo": true,
+            "rank": 1,
+            "of": 9,
+            "gain": 5100000,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [],
+            "own": null
+          },
+          {
+            "name": "Lynx Titan",
+            "solo": true,
+            "rank": 2,
+            "of": 9,
+            "gain": 4000000,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [],
+            "own": null
+          },
+          {
+            "name": "Woox",
+            "solo": true,
+            "rank": 3,
+            "of": 9,
+            "gain": 3200000,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [],
+            "own": null
+          },
+          {
+            "name": "B0aty",
+            "solo": true,
+            "rank": 4,
+            "of": 9,
+            "gain": 610000,
+            "mine": false,
+            "gap": true,
+            "skull": {
+              "kind": "died",
+              "at": "{{now-5h}}",
+              "best": 610000,
+              "current": 95000
+            },
+            "members": [],
+            "own": null
+          },
+          {
+            "name": "{{rsn}}",
+            "solo": true,
+            "rank": 5,
+            "of": 9,
+            "gain": 400000,
+            "mine": true,
+            "gap": false,
+            "skull": null,
+            "members": [],
+            "own": null
+          },
+          {
+            "name": "Settled",
+            "solo": true,
+            "rank": 6,
+            "of": 9,
+            "gain": 150000,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [],
+            "own": null
+          }
+        ]
+      }
+    },
+    {
+      "number": 900007,
+      "name": "Leaderboard Vorkath",
+      "format": "botw",
+      "phase": "live",
+      "startsAt": "{{now-2d}}",
+      "endsAt": "{{now+5d}}",
+      "graceWindowSeconds": 3600,
+      "finalizedAt": null,
+      "entry": "on_roster",
+      "teams": [
+        {
+          "name": "Team Bandos",
+          "size": 8
+        }
+      ],
+      "standing": {
+        "gain": 4,
+        "teams": [
+          {
+            "name": "Team Bandos",
+            "solo": false,
+            "rank": 5,
+            "of": 6,
+            "gain": 120
+          }
+        ]
+      },
+      "leaderboard": {
+        "teams": [
+          {
+            "name": "Team Zamorak",
+            "solo": false,
+            "rank": 1,
+            "of": 6,
+            "gain": 310,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [
+              {
+                "rsn": "Alice",
+                "rank": 1,
+                "gain": 120,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Bob",
+                "rank": 2,
+                "gain": 100,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Carl",
+                "rank": 3,
+                "gain": 90,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              }
+            ],
+            "own": null
+          },
+          {
+            "name": "Team Saradomin",
+            "solo": false,
+            "rank": 2,
+            "of": 6,
+            "gain": 250,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [
+              {
+                "rsn": "Dana",
+                "rank": 1,
+                "gain": 110,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Eli",
+                "rank": 2,
+                "gain": 80,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Finn",
+                "rank": 3,
+                "gain": 60,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              }
+            ],
+            "own": null
+          },
+          {
+            "name": "Team Armadyl",
+            "solo": false,
+            "rank": 3,
+            "of": 6,
+            "gain": 180,
+            "mine": false,
+            "gap": false,
+            "skull": null,
+            "members": [
+              {
+                "rsn": "Gus",
+                "rank": 1,
+                "gain": 70,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Hal",
+                "rank": 1,
+                "gain": 70,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Ida",
+                "rank": 3,
+                "gain": 40,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              }
+            ],
+            "own": null
+          },
+          {
+            "name": "Team Bandos",
+            "solo": false,
+            "rank": 5,
+            "of": 6,
+            "gain": 120,
+            "mine": true,
+            "gap": true,
+            "skull": null,
+            "members": [
+              {
+                "rsn": "Jo",
+                "rank": 1,
+                "gain": 60,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              },
+              {
+                "rsn": "Kim",
+                "rank": 2,
+                "gain": 30,
+                "mine": false,
+                "removed": true,
+                "skull": null
+              },
+              {
+                "rsn": "Lu",
+                "rank": 3,
+                "gain": 20,
+                "mine": false,
+                "removed": false,
+                "skull": null
+              }
+            ],
+            "own": {
+              "rsn": "{{rsn}}",
+              "rank": 6,
+              "of": 8,
+              "gain": 4,
+              "skull": null
+            }
+          }
+        ]
+      }
     }
   ]
 }

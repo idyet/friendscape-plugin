@@ -27,7 +27,6 @@ import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
-import net.runelite.client.ui.PluginPanel;
 
 /**
  * A bingo card's mini board (SPEC 10.3): a Team dropdown over one Team's grid. Cells show the Tile's
@@ -53,8 +52,8 @@ class MiniBoardView extends JPanel
 		void openTile(int teamNumber, int number);
 	}
 
-	/** What a card leaves for the grid: the side panel less its border and the card's padding. */
-	private static final int WIDTH = PluginPanel.PANEL_WIDTH - 20 - 16;
+	/** What a card leaves for the grid. */
+	private static final int WIDTH = FriendscapePanel.CARD_WIDTH;
 	/** Item sprites are 36x32; larger squares only waste room. */
 	private static final int MAX_CELL = 32;
 	private static final int GAP = 2;
@@ -62,7 +61,6 @@ class MiniBoardView extends JPanel
 	private static final int PICKER_GAP = 4;
 	/** What a dropdown line leaves for text: the card width less the arrow button and insets. */
 	static final int LABEL_WIDTH = WIDTH - 28;
-	private static final String ELLIPSIS = "...";
 	private static final Color FILL = new Color(ColorScheme.PROGRESS_COMPLETE_COLOR.getRed(),
 		ColorScheme.PROGRESS_COMPLETE_COLOR.getGreen(), ColorScheme.PROGRESS_COMPLETE_COLOR.getBlue(), 110);
 
@@ -159,18 +157,7 @@ class MiniBoardView extends JPanel
 	/** A dropdown line fitted to {@code width}: only the name is cut, so the points always show. */
 	static String label(DiscoveryResponse.BoardTeam team, FontMetrics metrics, int width)
 	{
-		String name = team.getName() == null ? "" : team.getName();
-		String suffix = suffix(team);
-		if (metrics.stringWidth(name + suffix) <= width)
-		{
-			return name + suffix;
-		}
-		int keep = name.length();
-		while (keep > 0 && metrics.stringWidth(name.substring(0, keep) + ELLIPSIS + suffix) > width)
-		{
-			keep--;
-		}
-		return name.substring(0, keep).trim() + ELLIPSIS + suffix;
+		return TextFit.fit("", team.getName() == null ? "" : team.getName(), suffix(team), metrics, width);
 	}
 
 	private static String suffix(DiscoveryResponse.BoardTeam team)
