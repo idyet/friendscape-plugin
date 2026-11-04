@@ -17,6 +17,8 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.DefaultListCellRenderer;
+import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -31,6 +33,7 @@ import javax.swing.JToggleButton;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
+import net.runelite.client.util.ImageUtil;
 
 /**
  * Side panel: the header (name, connection status, "Playing as", "Turn on sending"), then one card per
@@ -96,6 +99,11 @@ class FriendscapePanel extends PluginPanel
 	private static final int INDENT = 8;
 	/** Between a Leaderboard row's name and its value. */
 	private static final int ROW_GAP = 5;
+	/** A skulled player's name and value (SPEC 5.7). */
+	static final Color DEAD_COLOR = new Color(0xFF4F4F);
+	/** The Hiscores Hardcore skull, scaled once from 25px. */
+	private static final Icon SKULL = new ImageIcon(
+		ImageUtil.resizeImage(ImageUtil.loadImageResource(FriendscapePanel.class, "skull.png"), 12, 12));
 
 	static final String VOTE_NOTE = "Cast in game, website changes blocked";
 
@@ -416,7 +424,7 @@ class FriendscapePanel extends PluginPanel
 			value.setText(row.getValue());
 			if (row.isSkull())
 			{
-				value.setIcon(Glyphs.skull());
+				value.setIcon(SKULL);
 			}
 			int nameWidth = CARD_WIDTH - indent - ROW_GAP - value.getPreferredSize().width;
 			name.setText(row.isGap() ? EventCard.Row.GAP_TEXT : TextFit.fit(row.getPlace(), row.getName(), row.getMark(),
@@ -427,7 +435,7 @@ class FriendscapePanel extends PluginPanel
 			setMaximumSize(new Dimension(CARD_WIDTH, getPreferredSize().height));
 		}
 
-		/** The player's rows in the brand orange, as on the Team dropdown; others light gray; removed members grey. */
+		/** Skulled rows red; the player's in the brand orange, as on the Team dropdown; others light gray; removed members grey. */
 		private static Color shade(EventCard.Shade shade)
 		{
 			switch (shade)
@@ -436,6 +444,8 @@ class FriendscapePanel extends PluginPanel
 					return ColorScheme.BRAND_ORANGE;
 				case REMOVED:
 					return ColorScheme.MEDIUM_GRAY_COLOR;
+				case DEAD:
+					return DEAD_COLOR;
 				default:
 					return ColorScheme.LIGHT_GRAY_COLOR;
 			}
@@ -517,7 +527,11 @@ class FriendscapePanel extends PluginPanel
 				String tooltip = i == lines.size() - 1 ? card.getGainTooltip() : null;
 				if (skull != null && i == skull.getLine())
 				{
-					label.setIcon(Glyphs.skull());
+					label.setIcon(SKULL);
+					if (!card.isLeft())
+					{
+						label.setForeground(DEAD_COLOR);
+					}
 					tooltip = tooltip == null ? skull.getTooltip() : tooltip + ". " + skull.getTooltip();
 				}
 				label.setToolTipText(tooltip);

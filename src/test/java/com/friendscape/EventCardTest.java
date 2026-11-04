@@ -450,7 +450,7 @@ public class EventCardTest
 		assertEquals(List.of("1st Zezima  +5M xp", "2nd Lynx Titan  +4.1M xp", "3rd Woox  +3M xp", "...",
 			"6th B0aty  +1.5M xp", "7th Iron Man  +1.2M xp", "8th Settled  +900K xp"), texts(rows));
 		assertTrue(rows.get(3).isGap());
-		assertEquals(EventCard.Shade.MINE, rows.get(5).getShade());
+		assertEquals(EventCard.Shade.DEAD, rows.get(5).getShade());
 		assertEquals(EventCard.Shade.OTHER, rows.get(0).getShade());
 		assertFalse(rows.get(0).isIndent());
 	}
@@ -488,7 +488,25 @@ public class EventCardTest
 		assertTrue(rows.get(9).isIndent());
 		assertEquals(EventCard.Shade.MINE, rows.get(5).getShade());
 		assertEquals(EventCard.Shade.OTHER, rows.get(6).getShade());
-		assertEquals(EventCard.Shade.MINE, rows.get(9).getShade());
+		assertEquals(EventCard.Shade.DEAD, rows.get(9).getShade());
+	}
+
+	private static final String SKULLED_MEMBERS = "\"leaderboard\":{\"teams\":["
+		+ boardTeam("Zamorak", false, 1, 300, false, false, ",\"skull\":null,\"members\":["
+			+ member("Alice", 1, 120, false, false).replace("\"skull\":null", DIED) + ","
+			+ member("Bob", 2, 100, false, true).replace("\"skull\":null", DIED) + ","
+			+ member("Iron Man", 3, 80, true, false).replace("\"skull\":null", DIED) + "],\"own\":null") + "]}";
+
+	@Test
+	public void shadesASkulledRowDeadOverOwnButNotOverRemoved()
+	{
+		List<EventCard.Row> rows = card(SKULLED_MEMBERS).getLeaderboard();
+
+		assertEquals(EventCard.Shade.OTHER, rows.get(0).getShade());
+		assertEquals(EventCard.Shade.DEAD, rows.get(1).getShade());
+		assertEquals(EventCard.Shade.REMOVED, rows.get(2).getShade());
+		assertTrue(rows.get(2).isSkull());
+		assertEquals(EventCard.Shade.DEAD, rows.get(3).getShade());
 	}
 
 	@Test

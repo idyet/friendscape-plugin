@@ -383,6 +383,20 @@ public class FriendscapePanelTest
 		assertNotNull(((JLabel) lines[1]).getIcon());
 		assertEquals("+13,034,431 xp. Died 2 Nov 14:05. Showing best life. Current life: 340K.",
 			((JLabel) lines[1]).getToolTipText());
+		assertEquals(ColorScheme.LIGHT_GRAY_COLOR, lines[0].getForeground());
+		assertEquals(FriendscapePanel.DEAD_COLOR, lines[1].getForeground());
+	}
+
+	@Test
+	public void greysTheSkulledLineOnALeftEvent()
+	{
+		panel.update(discovered(new EventCard(111111, "Event 111111", CardState.LEFT, "Left",
+			List.of("+13M xp since start"), null, List.of(), "", null, EventCard.OPEN_EVENT_PAGE, false, false, true,
+			null, false, null, null, new EventCard.Skull(0, "Died. Showing best life. Current life: 1."), null)));
+
+		Component line = panel.cardViews.get(0).standing.getComponents()[0];
+		assertNotNull(((JLabel) line).getIcon());
+		assertEquals(ColorScheme.MEDIUM_GRAY_COLOR, line.getForeground());
 	}
 
 	@Test
@@ -660,7 +674,7 @@ public class FriendscapePanelTest
 		EventCard.Row.GAP,
 		new EventCard.Row(false, false, "5th ", "Bandos", " (you)", "+120 kc", null, EventCard.Shade.MINE, false),
 		new EventCard.Row(false, true, "", "Iron Man", ":", "+5 (7th of 9)", "Died. Showing best life. Current life: 1.",
-			EventCard.Shade.MINE, true));
+			EventCard.Shade.DEAD, true));
 
 	private static EventCard ranked(CardState state)
 	{
@@ -723,6 +737,18 @@ public class FriendscapePanelTest
 		assertEquals("Removed from the roster", view.leaderboardRow(2).name.getToolTipText());
 		assertEquals(ColorScheme.BRAND_ORANGE, view.leaderboardRow(4).name.getForeground());
 		assertEquals(ColorScheme.BRAND_ORANGE, view.leaderboardRow(4).value.getForeground());
+		assertEquals(FriendscapePanel.DEAD_COLOR, view.leaderboardRow(5).name.getForeground());
+		assertEquals(FriendscapePanel.DEAD_COLOR, view.leaderboardRow(5).value.getForeground());
+	}
+
+	@Test
+	public void greysEveryLeaderboardRowOnALeftEventSkulledOnesToo()
+	{
+		panel.update(openLeaderboard(ranked(CardState.LEFT)));
+		FriendscapePanel.CardView view = panel.cardViews.get(0);
+
+		assertEquals(ColorScheme.MEDIUM_GRAY_COLOR, view.leaderboardRow(4).name.getForeground());
+		assertEquals(ColorScheme.MEDIUM_GRAY_COLOR, view.leaderboardRow(5).name.getForeground());
 	}
 
 	@Test

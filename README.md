@@ -78,3 +78,5 @@ Build and run instructions are in [CONTRIBUTING.md](CONTRIBUTING.md), including 
 ## License
 
 [BSD 2-Clause](LICENSE).
+
+Hardcore skull image (c) Jagex Ltd.

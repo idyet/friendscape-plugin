@@ -77,7 +77,9 @@ class EventCard
 	{
 		MINE,
 		OTHER,
-		REMOVED
+		REMOVED,
+		/** Skulled (SPEC 5.7): beats MINE, loses to REMOVED. */
+		DEAD
 	}
 
 	/**
@@ -375,8 +377,8 @@ class EventCard
 			}
 			rows.add(new Row(false, false, ordinal(team.getRank()) + " ", orEmpty(team.getName()),
 				team.isMine() && !team.isSolo() ? " (you)" : "", signed(event, team.getGain()) + unit,
-				tooltip(event, team.getGain(), false, team.getSkull(), zone), team.isMine() ? Shade.MINE : Shade.OTHER,
-				team.getSkull() != null));
+				tooltip(event, team.getGain(), false, team.getSkull(), zone),
+				shade(false, team.getSkull() != null, team.isMine()), team.getSkull() != null));
 			if (team.getMembers() != null)
 			{
 				for (DiscoveryResponse.LeaderboardMember member : team.getMembers())
@@ -385,7 +387,7 @@ class EventCard
 					{
 						continue;
 					}
-					Shade shade = member.isRemoved() ? Shade.REMOVED : member.isMine() ? Shade.MINE : Shade.OTHER;
+					Shade shade = shade(member.isRemoved(), member.getSkull() != null, member.isMine());
 					rows.add(new Row(false, true, ordinal(member.getRank()) + " ", orEmpty(member.getRsn()), "",
 						signed(event, member.getGain()), tooltip(event, member.getGain(), member.isRemoved(),
 						member.getSkull(), zone), shade, member.getSkull() != null));
@@ -396,10 +398,16 @@ class EventCard
 			{
 				rows.add(new Row(false, true, "", orEmpty(own.getRsn()), ":", signed(event, own.getGain()) + " ("
 					+ ordinal(own.getRank()) + " of " + own.getOf() + ")", tooltip(event, own.getGain(), false,
-					own.getSkull(), zone), Shade.MINE, own.getSkull() != null));
+					own.getSkull(), zone), shade(false, own.getSkull() != null, true), own.getSkull() != null));
 			}
 		}
 		return rows;
+	}
+
+	/** A row's shade: removed, then skulled, then the player's own, else other. */
+	private static Shade shade(boolean removed, boolean skull, boolean mine)
+	{
+		return removed ? Shade.REMOVED : skull ? Shade.DEAD : mine ? Shade.MINE : Shade.OTHER;
 	}
 
 	/** The full XP figure, why a member is greyed and the skull's text, each when it applies; else null. */
