@@ -419,8 +419,13 @@ public class FriendscapeApiTest
 
 	private void discover(FriendscapeApi api) throws InterruptedException
 	{
+		discover(api, 0, false);
+	}
+
+	private void discover(FriendscapeApi api, int accountType, boolean hardcore) throws InterruptedException
+	{
 		CountDownLatch done = new CountDownLatch(1);
-		api.discover("Iron Man", 7L, response ->
+		api.discover("Iron Man", 7L, accountType, hardcore, response ->
 		{
 			discovered.set(response);
 			done.countDown();
@@ -443,9 +448,22 @@ public class FriendscapeApiTest
 		discover(api);
 
 		assertEquals(List.of("https://friendscape.test/api/v1/plugin/discovery"), requestedUrls);
-		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\"}"), json(requestBodies.get(0)));
+		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"accountType\":0,\"hardcore\":false}"),
+			json(requestBodies.get(0)));
 		assertEquals(5, discovered.get().getEvents().get(0).getStanding().getGain());
 		assertEquals(ConnectionStatus.CONNECTED, connection.get());
+	}
+
+	@Test
+	public void discoveryCarriesTheRawAccountTypeAndTheWorldBit() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		// 3 is Hardcore Ironman, sent raw: core maps it (SPEC 6.13)
+		discover(api, 3, true);
+
+		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"accountType\":3,\"hardcore\":true}"),
+			json(requestBodies.get(0)));
 	}
 
 	@Test
@@ -699,7 +717,7 @@ public class FriendscapeApiTest
 		report(api);
 		sendSubmission(api, VISAGE, null);
 
-		assertEquals(List.of("3", "3", "3", "3"), protocolHeaders);
+		assertEquals(List.of("4", "4", "4", "4"), protocolHeaders);
 	}
 
 	@Test

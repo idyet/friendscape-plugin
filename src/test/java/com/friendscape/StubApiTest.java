@@ -86,7 +86,8 @@ public class StubApiTest
 
 	private DiscoveryResponse discover() throws IOException, InterruptedException
 	{
-		HttpResponse<String> response = post("v1/plugin/discovery", "{\"rsn\":\"Iron Man\",\"accountHash\":\"42\"}");
+		HttpResponse<String> response = post("v1/plugin/discovery",
+			"{\"rsn\":\"Iron Man\",\"accountHash\":\"42\",\"accountType\":3,\"hardcore\":false}");
 		assertEquals(200, response.statusCode());
 		return GSON.fromJson(response.body(), DiscoveryResponse.class);
 	}
@@ -221,7 +222,8 @@ public class StubApiTest
 	{
 		discover();
 
-		assertEquals(List.of("[stub] /api/v1/plugin/discovery protocol=2 version=0.1.3 rsn=Iron Man accountHash=42"),
+		assertEquals(List.of("[stub] /api/v1/plugin/discovery protocol=2 version=0.1.3 rsn=Iron Man accountHash=42 "
+			+ "accountType=3 hardcore=false"),
 			logged);
 	}
 

@@ -224,6 +224,8 @@ class StubApi
 				String rsn = text(identity, "rsn");
 				line.add("rsn=" + rsn);
 				line.add("accountHash=" + text(identity, "accountHash"));
+				line.add("accountType=" + text(identity, "accountType"));
+				line.add("hardcore=" + text(identity, "hardcore"));
 				return new Reply(200, discoveryJson(rsn));
 			}
 			case "v1/plugin/readings":

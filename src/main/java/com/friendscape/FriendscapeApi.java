@@ -45,9 +45,9 @@ class FriendscapeApi
 	 * The payload protocol, sent on every request as {@link #PROTOCOL_HEADER} (SPEC 11). Unlike
 	 * {@link #VERSION}, the server gates on it: bump by hand only when a payload gains a field the
 	 * server must tell apart from its absence. 2: Readings carry {@code hardcore}. 3: Hardcore
-	 * Readings carry {@code dead}.
+	 * Readings carry {@code dead}. 4: discovery carries {@code accountType} and {@code hardcore}.
 	 */
-	static final int PROTOCOL = 3;
+	static final int PROTOCOL = 4;
 	static final String PROTOCOL_HEADER = "X-Friendscape-Protocol";
 
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -118,17 +118,22 @@ class FriendscapeApi
 
 	/**
 	 * Asks which Events roster the character, with each one's phase, Roster entry state and
-	 * standing. {@code onConnection} hears whether the server answered at all: a refusal (4xx) is an
+	 * standing. {@code accountType} is varbit {@code IRONMAN} as read, unmapped: core owns the
+	 * mapping, so a fix needs no plugin release (SPEC 6.13). {@code hardcore} is the World bit, as on
+	 * Readings. {@code onConnection} hears whether the server answered at all: a refusal (4xx) is an
 	 * answer (connected), a server error or failed connection is not (unreachable), and an answer
 	 * from something on the network is blocked; {@code onResult} hears only a successful answer.
 	 * Both come back on an OkHttp thread, and neither for a call refused here or cancelled.
 	 */
-	void discover(String rsn, long accountHash, Consumer<DiscoveryResponse> onResult,
-		Consumer<ConnectionStatus> onConnection)
+	void discover(String rsn, long accountHash, int accountType, boolean hardcore,
+		Consumer<DiscoveryResponse> onResult, Consumer<ConnectionStatus> onConnection)
 	{
+		Map<String, Object> body = identity(rsn, accountHash);
+		body.put("accountType", accountType);
+		body.put("hardcore", hardcore);
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/discovery"))
-			.post(RequestBody.create(JSON, gson.toJson(identity(rsn, accountHash))))
+			.post(RequestBody.create(JSON, gson.toJson(body)))
 			.build();
 		enqueue(request, response ->
 		{

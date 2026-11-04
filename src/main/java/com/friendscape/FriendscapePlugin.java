@@ -42,6 +42,7 @@ import net.runelite.api.events.CommandExecuted;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.StatChanged;
+import net.runelite.api.gameval.VarbitID;
 import net.runelite.client.Notifier;
 import net.runelite.client.RuneLite;
 import net.runelite.client.callback.ClientThread;
@@ -861,13 +862,25 @@ public class FriendscapePlugin extends Plugin
 	 */
 	private void discover()
 	{
+		if (rsn == null || !mayTransmit())
+		{
+			return;
+		}
+		// Varbits are read on the client thread; fresh each time, so a lost Hardcore status shows next call
+		clientThread.invoke(this::sendDiscovery);
+	}
+
+	/** Discovery itself, on the client thread: the Account type travels raw (SPEC 6.13). */
+	private void sendDiscovery()
+	{
 		String name = rsn;
 		if (name == null || !mayTransmit())
 		{
 			return;
 		}
 		int sentIn = session.get();
-		api.discover(name, accountHash, response ->
+		int accountType = client.getVarbitValue(VarbitID.IRONMAN);
+		api.discover(name, accountHash, accountType, worldHardcore, response ->
 		{
 			if (session.get() != sentIn)
 			{
