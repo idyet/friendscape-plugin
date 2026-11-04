@@ -53,7 +53,7 @@ class EventCard
 	/** The Group the Event came from; null when none, or from an older server. */
 	@With
 	DiscoveryResponse.Group group;
-	/** The Hardcore death skull on a standing line; null without one (SPEC 5.7). */
+	/** The skull (death or Standard Reset) on a standing line; null without one (SPEC 5.7). */
 	Skull skull;
 	/**
 	 * A started metric Event's Leaderboard rows, drawn in place of the standing line when opened
@@ -103,7 +103,7 @@ class EventCard
 		/** Null when there is nothing more to say. */
 		String tooltip;
 		Shade shade;
-		/** A Hardcore death skull by the value (SPEC 5.7). */
+		/** A skull (death or Standard Reset) by the value (SPEC 5.7). */
 		boolean skull;
 
 		/** The row as one line: "1st Red (you)  +1.2M xp". */

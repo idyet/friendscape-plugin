@@ -77,7 +77,7 @@ final class Glyphs
 		});
 	}
 
-	/** A skull: a Hardcore death on the standing line (SPEC 5.7). */
+	/** A skull: a death or Standard Reset on the standing line (SPEC 5.7). */
 	static Icon skull()
 	{
 		return new Painted(10, 11, (g, x, y) ->

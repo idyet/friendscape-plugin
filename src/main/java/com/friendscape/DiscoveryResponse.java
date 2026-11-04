@@ -340,7 +340,7 @@ class DiscoveryResponse
 		Skull skull;
 	}
 
-	/** A Hardcore death on the standing: the skull by the player's name (SPEC 5.7). */
+	/** A death or Standard Reset on the standing: the skull by the player's name (SPEC 5.7). */
 	@Value
 	static class Skull
 	{
