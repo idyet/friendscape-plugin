@@ -39,7 +39,7 @@ class FriendscapeApi
 	 * runelite-plugin.properties, which a test checks. Not generated: the Plugin Hub builds with its
 	 * own Gradle script, so tasks in build.gradle never run there.
 	 */
-	static final String VERSION = "0.3.0";
+	static final String VERSION = "0.4.0";
 	static final String VERSION_HEADER = "X-Friendscape-Version";
 	/**
 	 * The payload protocol, sent on every request as {@link #PROTOCOL_HEADER} (SPEC 11). Unlike
