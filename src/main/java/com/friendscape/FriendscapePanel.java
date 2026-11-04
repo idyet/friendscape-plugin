@@ -99,7 +99,7 @@ class FriendscapePanel extends PluginPanel
 	private static final int INDENT = 8;
 	/** Between a Leaderboard row's name and its value. */
 	private static final int ROW_GAP = 5;
-	/** A skulled player's name and value (SPEC 5.7). */
+	/** A skulled player's name and value (SPEC 5.7); clears AA on RuneLite's dark panel. */
 	static final Color DEAD_COLOR = new Color(0xFF4F4F);
 	/** The Hiscores Hardcore skull, scaled once from 25px. */
 	private static final Icon SKULL = new ImageIcon(
