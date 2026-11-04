@@ -119,17 +119,21 @@ class FriendscapeApi
 	/**
 	 * Asks which Events roster the character, with each one's phase, Roster entry state and
 	 * standing. {@code accountType} is varbit {@code IRONMAN} as read, unmapped: core owns the
-	 * mapping, so a fix needs no plugin release (SPEC 6.13). {@code hardcore} is the World bit, as on
+	 * mapping, so a fix needs no plugin release (SPEC 6.13); null, and left out, until varps sync.
+	 * {@code hardcore} is the World bit, as on
 	 * Readings. {@code onConnection} hears whether the server answered at all: a refusal (4xx) is an
 	 * answer (connected), a server error or failed connection is not (unreachable), and an answer
 	 * from something on the network is blocked; {@code onResult} hears only a successful answer.
 	 * Both come back on an OkHttp thread, and neither for a call refused here or cancelled.
 	 */
-	void discover(String rsn, long accountHash, int accountType, boolean hardcore,
+	void discover(String rsn, long accountHash, Integer accountType, boolean hardcore,
 		Consumer<DiscoveryResponse> onResult, Consumer<ConnectionStatus> onConnection)
 	{
 		Map<String, Object> body = identity(rsn, accountHash);
-		body.put("accountType", accountType);
+		if (accountType != null)
+		{
+			body.put("accountType", accountType);
+		}
 		body.put("hardcore", hardcore);
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/discovery"))

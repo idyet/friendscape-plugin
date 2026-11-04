@@ -422,7 +422,7 @@ public class FriendscapeApiTest
 		discover(api, 0, false);
 	}
 
-	private void discover(FriendscapeApi api, int accountType, boolean hardcore) throws InterruptedException
+	private void discover(FriendscapeApi api, Integer accountType, boolean hardcore) throws InterruptedException
 	{
 		CountDownLatch done = new CountDownLatch(1);
 		api.discover("Iron Man", 7L, accountType, hardcore, response ->
@@ -463,6 +463,18 @@ public class FriendscapeApiTest
 		discover(api, 3, true);
 
 		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"accountType\":3,\"hardcore\":true}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void discoveryLeavesOutAnAccountTypeNotYetSynced() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		// Absent leaves the stored value alone, where a 0 read too early would store regular
+		discover(api, null, false);
+
+		assertEquals(json("{\"rsn\":\"Iron Man\",\"accountHash\":\"7\",\"hardcore\":false}"),
 			json(requestBodies.get(0)));
 	}
 

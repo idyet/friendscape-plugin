@@ -874,12 +874,14 @@ public class FriendscapePlugin extends Plugin
 	private void sendDiscovery()
 	{
 		String name = rsn;
+		// Rechecked: a logout may have run between the call and this turn on the client thread
 		if (name == null || !mayTransmit())
 		{
 			return;
 		}
 		int sentIn = session.get();
-		int accountType = client.getVarbitValue(VarbitID.IRONMAN);
+		// Before varps sync the varbit reads 0, which would store an Ironman as regular
+		Integer accountType = deathRecord.synced() ? client.getVarbitValue(VarbitID.IRONMAN) : null;
 		api.discover(name, accountHash, accountType, worldHardcore, response ->
 		{
 			if (session.get() != sentIn)
