@@ -168,6 +168,8 @@ public class FriendscapePlugin extends Plugin
 	private volatile ConnectionStatus connection = ConnectionStatus.CONNECTING;
 
 	private final XpTracker xpTracker = new XpTracker();
+	/** Read each game tick on the client thread; Hardcore Readings carry it as {@code dead}. */
+	private final DeathRecord deathRecord = new DeathRecord();
 	/** The next Reading carries every skill: after login, sending turning on, or an Event's start or end. */
 	private volatile boolean sendAllSkills = true;
 	/** The marks the next every-skill Reading carries: empty, except for a start or end Reading. */
@@ -416,6 +418,8 @@ public class FriendscapePlugin extends Plugin
 			case LOGGING_IN:
 				loggedIn = false;
 				cancelAll();
+				// Varps resync on the new world, so the record is read afresh
+				deathRecord.reset();
 				break;
 			case LOGIN_SCREEN:
 				cancelAll();
@@ -441,6 +445,7 @@ public class FriendscapePlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick tick)
 	{
+		boolean deathTick = deathRecord.observe(client.getVarpValue(DeathRecord.VARP));
 		// The local player's name is not set on the LOGGED_IN tick itself
 		if (rsn == null)
 		{
@@ -455,7 +460,12 @@ public class FriendscapePlugin extends Plugin
 			discover();
 		}
 		detector.tick();
-		sendDueReadings(Instant.now());
+		Instant now = Instant.now();
+		// A Reading sent this tick already carries the death
+		if (!sendDueReadings(now) && deathTick)
+		{
+			sendDeathReading(now);
+		}
 	}
 
 	/** NPC kills (SPEC 10.2). */
@@ -698,9 +708,9 @@ public class FriendscapePlugin extends Plugin
 
 	/**
 	 * XP Readings (SPEC 5.2): every skill at login and at an Event's start or end, then changes once
-	 * a minute. The ones at a start or end are marked as such.
+	 * a minute. The ones at a start or end are marked as such. True if one was sent.
 	 */
-	private void sendDueReadings(Instant now)
+	private boolean sendDueReadings(Instant now)
 	{
 		Instant moment = momentReadingAt.get();
 		ReadingsResponse last = lastResponse;
@@ -722,26 +732,50 @@ public class FriendscapePlugin extends Plugin
 			}
 			pendingMoments = due;
 		}
-		if (!mayTransmit() || !readingsWanted(now))
+		// Checked before the login Reading primes the tracker, which a refused send would lose
+		if (!mayTransmit() || !readingsWanted(now) || !varpsReady())
 		{
-			return;
+			return false;
 		}
 		if (sendAllSkills)
 		{
 			Map<String, Long> skills = currentSkills();
 			if (skills == null)
 			{
-				return;
+				return false;
 			}
 			sendAllSkills = false;
 			Set<Moment> moments = pendingMoments;
 			pendingMoments = Set.of();
 			sendReadings(xpTracker.takeAll(skills, now), Map.of(), moments);
+			return true;
 		}
-		else if (xpTracker.due(now))
+		if (xpTracker.due(now))
 		{
 			sendReadings(xpTracker.takeChanged(now), Map.of(), Set.of());
+			return true;
 		}
+		return false;
+	}
+
+	/** Whether a Reading may go: on a Hardcore world, only once the death record has synced. */
+	private boolean varpsReady()
+	{
+		// A Hardcore Reading before varps sync could read a dead character alive
+		return !worldHardcore || deathRecord.synced();
+	}
+
+	/**
+	 * The death report (SPEC 5.7): on the death tick, every skill changed since the last send goes
+	 * at once, outside the minute, even if none changed. A login Reading still due carries it instead.
+	 */
+	private void sendDeathReading(Instant now)
+	{
+		if (!worldHardcore || sendAllSkills || !mayTransmit() || !readingsWanted(now))
+		{
+			return;
+		}
+		transmitReadings(xpTracker.takeChanged(now), Map.of(), Set.of());
 	}
 
 	/** Every skill's XP by slug, or null while the client has not loaded stats yet. */
@@ -766,15 +800,24 @@ public class FriendscapePlugin extends Plugin
 
 	private void sendReadings(Map<String, Long> xp, Map<String, Long> kcChat, Set<Moment> moments)
 	{
+		if (!xp.isEmpty() || !kcChat.isEmpty())
+		{
+			transmitReadings(xp, kcChat, moments);
+		}
+	}
+
+	/** Sends a Reading, empty or not, once {@link #varpsReady}. */
+	private void transmitReadings(Map<String, Long> xp, Map<String, Long> kcChat, Set<Moment> moments)
+	{
 		String name = rsn;
-		if ((xp.isEmpty() && kcChat.isEmpty()) || name == null)
+		if (name == null || !varpsReady())
 		{
 			return;
 		}
 		DiscoveryResponse found = discovery;
 		Set<Integer> muted = found == null ? Set.of() : found.muted(left());
 		int sentIn = session.get();
-		api.sendReadings(name, accountHash, worldHardcore, xp, kcChat, moments, muted, response ->
+		api.sendReadings(name, accountHash, worldHardcore, deathRecord.dead(), xp, kcChat, moments, muted, response ->
 		{
 			if (session.get() != sentIn)
 			{
@@ -1008,6 +1051,7 @@ public class FriendscapePlugin extends Plugin
 	{
 		session.incrementAndGet();
 		xpTracker.reset();
+		deathRecord.reset();
 		sendAllSkills = true;
 		pendingMoments = Set.of();
 		momentReadingAt.set(null);

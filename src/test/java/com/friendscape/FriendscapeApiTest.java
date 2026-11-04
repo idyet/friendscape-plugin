@@ -284,15 +284,15 @@ public class FriendscapeApiTest
 	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp, Map<String, Long> kcChat,
 		Set<Moment> moments, Set<Integer> muted) throws InterruptedException
 	{
-		return sendReadings(api, xp, kcChat, moments, muted, false);
+		return sendReadings(api, xp, kcChat, moments, muted, false, false);
 	}
 
 	private ReadingsResponse sendReadings(FriendscapeApi api, Map<String, Long> xp, Map<String, Long> kcChat,
-		Set<Moment> moments, Set<Integer> muted, boolean hardcore) throws InterruptedException
+		Set<Moment> moments, Set<Integer> muted, boolean hardcore, boolean dead) throws InterruptedException
 	{
 		CountDownLatch done = new CountDownLatch(1);
 		AtomicReference<ReadingsResponse> result = new AtomicReference<>();
-		api.sendReadings("Iron Man", -4611686018427387904L, hardcore, xp, kcChat, moments, muted, response ->
+		api.sendReadings("Iron Man", -4611686018427387904L, hardcore, dead, xp, kcChat, moments, muted, response ->
 		{
 			result.set(response);
 			done.countDown();
@@ -346,11 +346,37 @@ public class FriendscapeApiTest
 	{
 		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
 
-		sendReadings(api, Map.of(), Map.of("Barrows chest", 45L), Set.of(), Set.of(), true);
+		sendReadings(api, Map.of(), Map.of("Barrows chest", 45L), Set.of(), Set.of(), true, false);
 
 		assertEquals(
 			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"hardcore\":true,"
-				+ "\"kcChat\":{\"Barrows chest\":45}}"),
+				+ "\"dead\":false,\"kcChat\":{\"Barrows chest\":45}}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void aHardcoreReadingReportsTheDeath() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		sendReadings(api, Map.of(), Map.of(), Set.of(), Set.of(), true, true);
+
+		assertEquals(
+			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"hardcore\":true,"
+				+ "\"dead\":true}"),
+			json(requestBodies.get(0)));
+	}
+
+	@Test
+	public void aRegularWorldReadingNeverSaysDead() throws InterruptedException
+	{
+		FriendscapeApi api = api(clientAnswering(200, "{\"rsn\":\"Iron Man\",\"events\":[]}"));
+
+		sendReadings(api, Map.of("overall", 1L), Map.of(), Set.of(), Set.of(), false, true);
+
+		assertEquals(
+			json("{\"rsn\":\"Iron Man\",\"accountHash\":\"-4611686018427387904\",\"hardcore\":false,"
+				+ "\"xp\":{\"overall\":1}}"),
 			json(requestBodies.get(0)));
 	}
 
@@ -673,7 +699,7 @@ public class FriendscapeApiTest
 		report(api);
 		sendSubmission(api, VISAGE, null);
 
-		assertEquals(List.of("2", "2", "2", "2"), protocolHeaders);
+		assertEquals(List.of("3", "3", "3", "3"), protocolHeaders);
 	}
 
 	@Test

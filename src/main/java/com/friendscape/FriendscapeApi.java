@@ -44,9 +44,10 @@ class FriendscapeApi
 	/**
 	 * The payload protocol, sent on every request as {@link #PROTOCOL_HEADER} (SPEC 11). Unlike
 	 * {@link #VERSION}, the server gates on it: bump by hand only when a payload gains a field the
-	 * server must tell apart from its absence. 2: Readings carry {@code hardcore}.
+	 * server must tell apart from its absence. 2: Readings carry {@code hardcore}. 3: Hardcore
+	 * Readings carry {@code dead}.
 	 */
-	static final int PROTOCOL = 2;
+	static final int PROTOCOL = 3;
 	static final String PROTOCOL_HEADER = "X-Friendscape-Protocol";
 
 	private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -215,16 +216,21 @@ class FriendscapeApi
 	 * Sends absolute skill XP by skill slug and lifetime KC by the name chat uses for it (the server
 	 * maps names to activities), either of which may be empty. Marked as the start or end Reading
 	 * for {@code moments}. {@code hardcore} is the World bit: captured on a Hardcore Main world.
+	 * {@code dead} is the death report, sent on Hardcore Readings only (SPEC 5.7).
 	 * Readings are never queued or retried: a failed send is dropped, since the next Reading carries
 	 * a total that covers it. {@code muted} holds the numbers of the Events left on this install. The server's
 	 * answer comes back on an OkHttp thread; nothing comes back for a failed or refused send.
 	 */
-	void sendReadings(String rsn, long accountHash, boolean hardcore, Map<String, Long> xp,
+	void sendReadings(String rsn, long accountHash, boolean hardcore, boolean dead, Map<String, Long> xp,
 		Map<String, Long> kcChat, Set<Moment> moments, Set<Integer> muted,
 		Consumer<ReadingsResponse> onResult)
 	{
 		Map<String, Object> body = identity(rsn, accountHash);
 		body.put("hardcore", hardcore);
+		if (hardcore)
+		{
+			body.put("dead", dead);
+		}
 		if (!xp.isEmpty())
 		{
 			body.put("xp", xp);
