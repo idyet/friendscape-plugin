@@ -246,6 +246,8 @@ class FriendscapeApi
 			// Named on each Reading only: the server captures nothing for these and stores no Leave
 			body.put("muted", muted);
 		}
+		// Spike for 186 check 7, never merged
+		log.info("[capture] reading {}", gson.toJson(body));
 		Request request = new Request.Builder()
 			.url(base.resolve("v1/plugin/readings"))
 			.post(RequestBody.create(JSON, gson.toJson(body)))

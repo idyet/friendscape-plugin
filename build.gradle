@@ -63,6 +63,13 @@ tasks.register('runDev', JavaExec) {
 	systemProperty 'friendscape.apiBase', 'https://dev.friendscape.cc/api/'
 }
 
+tasks.register('runCapture', JavaExec) {
+	description = 'Spike for 186 check 7: runDev plus the death capture logger ([capture] lines in client.log)'
+	configureClientLaunch(it)
+	mainClass = 'com.friendscape.DeathCaptureLaunch'
+	systemProperty 'friendscape.apiBase', 'https://dev.friendscape.cc/api/'
+}
+
 tasks.register('runStub', JavaExec) {
 	description = 'Like run, but against a local stub API that shows every card state (test sources only)'
 	configureClientLaunch(it)
